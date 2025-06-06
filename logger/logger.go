@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/jessewkun/gocommon/utils"
@@ -15,8 +16,28 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-var logzap *zap.Logger
-var logcfg Config
+var (
+	logzap   *zap.Logger
+	logcfg   Config
+	hostname string
+	localIP  string
+	once     sync.Once
+)
+
+// 初始化系统信息
+func initSystemInfo() {
+	once.Do(func() {
+		var err error
+		hostname, err = os.Hostname()
+		if err != nil {
+			hostname = "unknown"
+		}
+		localIP, err = utils.GetLocalIP()
+		if err != nil {
+			localIP = "unknown"
+		}
+	})
+}
 
 func Zap() *zap.Logger {
 	return logzap
@@ -66,10 +87,8 @@ func formatField(c context.Context, tag string) []zapcore.Field {
 	fields := make([]zapcore.Field, 0)
 
 	fields = append(fields, zap.String("tag", tag))
-	hostname, _ := os.Hostname()
 	fields = append(fields, zap.String("host", hostname))
-	ip, _ := utils.GetLocalIP()
-	fields = append(fields, zap.String("ip", ip))
+	fields = append(fields, zap.String("ip", localIP))
 
 	// 日志强制添加 trace_id 和 user_id
 	fields = append(fields, FieldsFromCtx(c)...)
@@ -87,6 +106,9 @@ func formatField(c context.Context, tag string) []zapcore.Field {
 
 // Info log
 func Info(c context.Context, tag string, msg string, args ...interface{}) {
+	if logcfg.Closed {
+		return
+	}
 	msg = fmt.Sprintf(msg, args...)
 	fields := formatField(c, tag)
 	logzap.Info(msg, fields...)
@@ -95,6 +117,9 @@ func Info(c context.Context, tag string, msg string, args ...interface{}) {
 
 // InfoWithField log
 func InfoWithField(c context.Context, tag string, msg string, field map[string]interface{}) {
+	if logcfg.Closed {
+		return
+	}
 	fields := formatField(c, tag)
 	for k, v := range field {
 		fields = append(fields, zap.Any(k, v))
@@ -105,6 +130,9 @@ func InfoWithField(c context.Context, tag string, msg string, field map[string]i
 
 // Error log
 func Error(c context.Context, tag string, err error) {
+	if logcfg.Closed {
+		return
+	}
 	fields := formatField(c, tag)
 	logzap.Error(err.Error(), fields...)
 	SendAlarm(c, "error", tag, err.Error())
@@ -112,6 +140,9 @@ func Error(c context.Context, tag string, err error) {
 
 // ErrorWithMsg log
 func ErrorWithMsg(c context.Context, tag string, msg string, args ...interface{}) {
+	if logcfg.Closed {
+		return
+	}
 	msg = fmt.Sprintf(msg, args...)
 	fields := formatField(c, tag)
 	logzap.Error(msg, fields...)
@@ -120,6 +151,9 @@ func ErrorWithMsg(c context.Context, tag string, msg string, args ...interface{}
 
 // ErrorWithField log
 func ErrorWithField(c context.Context, tag string, msg string, field map[string]interface{}) {
+	if logcfg.Closed {
+		return
+	}
 	fields := formatField(c, tag)
 	for k, v := range field {
 		fields = append(fields, zap.Any(k, v))
@@ -130,6 +164,9 @@ func ErrorWithField(c context.Context, tag string, msg string, field map[string]
 
 // Debug log
 func Debug(c context.Context, tag string, msg string, args ...interface{}) {
+	if logcfg.Closed {
+		return
+	}
 	msg = fmt.Sprintf(msg, args...)
 	fields := formatField(c, tag)
 	logzap.Debug(msg, fields...)
@@ -138,6 +175,9 @@ func Debug(c context.Context, tag string, msg string, args ...interface{}) {
 
 // Warn log
 func Warn(c context.Context, tag string, msg string, args ...interface{}) {
+	if logcfg.Closed {
+		return
+	}
 	msg = fmt.Sprintf(msg, args...)
 	fields := formatField(c, tag)
 	logzap.Warn(msg, fields...)
@@ -146,6 +186,9 @@ func Warn(c context.Context, tag string, msg string, args ...interface{}) {
 
 // WarnWithField log
 func WarnWithField(c context.Context, tag string, msg string, field map[string]interface{}) {
+	if logcfg.Closed {
+		return
+	}
 	fields := formatField(c, tag)
 	for k, v := range field {
 		fields = append(fields, zap.Any(k, v))
@@ -156,6 +199,9 @@ func WarnWithField(c context.Context, tag string, msg string, field map[string]i
 
 // Panic log
 func Panic(c context.Context, tag string, msg string, args ...interface{}) {
+	if logcfg.Closed {
+		return
+	}
 	msg = fmt.Sprintf(msg, args...)
 	fields := formatField(c, tag)
 	logzap.Panic(msg, fields...)
@@ -164,24 +210,21 @@ func Panic(c context.Context, tag string, msg string, args ...interface{}) {
 
 // Fatal log
 func Fatal(c context.Context, tag string, msg string, args ...interface{}) {
+	if logcfg.Closed {
+		return
+	}
 	msg = fmt.Sprintf(msg, args...)
 	fields := formatField(c, tag)
 	logzap.Fatal(msg, fields...)
 	SendAlarm(c, "fatal", tag, msg)
 }
 
-var alarmLevel = map[string][]string{
-	"debug": {"debug", "info", "warn", "error", "fatal", "panic"},
-	"info":  {"info", "warn", "error", "fatal", "panic"},
-	"warn":  {"warn", "error", "fatal", "panic"},
-	"error": {"error", "fatal", "panic"},
-	"fatal": {"fatal", "panic"},
-	"panic": {"panic"},
-}
-
 func SendAlarm(c context.Context, level string, tag string, msg string) {
+	if logcfg.Closed {
+		return
+	}
 	canAlarm := false
-	for _, v := range alarmLevel[logcfg.AlarmLevel] {
+	for _, v := range alarmLevelMap[logcfg.AlarmLevel] {
 		if v == level {
 			canAlarm = true
 			break
