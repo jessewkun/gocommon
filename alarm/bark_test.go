@@ -6,7 +6,7 @@ import (
 )
 
 func TestSendBark(t *testing.T) {
-	InitBark(Config{BarkIds: []string{"jT64URJj8b6Fp9Y3nVKJiP"}})
+	InitBark(&Config{BarkIds: []string{"jT64URJj8b6Fp9Y3nVKJiP"}})
 	type args struct {
 		ctx     context.Context
 		title   string
