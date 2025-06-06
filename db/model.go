@@ -60,6 +60,10 @@ func (t *DateTime) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func (t DateTime) String() string {
+	return time.Time(t).Format("2006-01-02 15:04:05")
+}
+
 // BaseModel 定义基础字段，方便所有业务模型继承
 type BaseModel struct {
 	ID        uint     `gorm:"primarykey" json:"id"`
