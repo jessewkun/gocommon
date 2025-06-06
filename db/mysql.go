@@ -17,17 +17,17 @@ const TAGNAME = "MYSQL"
 
 // connList 数据库连接列表
 var connList map[string]*gorm.DB
-var mysqlCfg map[string]Config
+var mysqlCfg map[string]*Config
 
 func init() {
 	connList = make(map[string]*gorm.DB)
 }
 
 // InitMysql 初始化数据库
-func InitMysql(cfg map[string]Config) {
+func InitMysql(cfg map[string]*Config) {
 	mysqlCfg = cfg
 	for dbName, conf := range cfg {
-		err := setDefaultConfig(&conf)
+		err := setDefaultConfig(conf)
 		if err != nil {
 			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, "mysql %s setDefaultConfig error: %s", dbName, err)
 			continue
@@ -68,7 +68,7 @@ func setDefaultConfig(conf *Config) error {
 }
 
 // dbConnect 连接数据库
-func dbConnect(dbName string, conf Config) (*gorm.DB, error) {
+func dbConnect(dbName string, conf *Config) (*gorm.DB, error) {
 	if _, ok := connList[dbName]; ok {
 		if connList[dbName] != nil {
 			return connList[dbName], nil

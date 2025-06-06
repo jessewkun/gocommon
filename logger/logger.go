@@ -43,8 +43,9 @@ func Zap() *zap.Logger {
 	return logzap
 }
 
-func InitLogger(cfg Config) {
-	logcfg = cfg
+func InitLogger(cfg *Config) {
+	initSystemInfo()
+	logcfg = *cfg
 	logzap = zap.New(initCore(), zap.AddCallerSkip(1), zap.AddCaller())
 }
 

@@ -25,7 +25,7 @@ var (
 const MaxRetry = 3
 
 // InitBark 初始化 Bark 报警
-func InitBark(config Config) error {
+func InitBark(config *Config) error {
 	// 如果 BarkIds 为空，则不初始化
 	if len(config.BarkIds) == 0 {
 		return nil

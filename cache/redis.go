@@ -21,9 +21,9 @@ func init() {
 }
 
 // InitRedis 初始化redis
-func InitRedis(cfg map[string]Config) {
+func InitRedis(cfg map[string]*Config) {
 	for dbName, conf := range cfg {
-		err := setDefaultConfig(&conf)
+		err := setDefaultConfig(conf)
 		if err != nil {
 			logger.ErrorWithMsg(context.Background(), TAGNAME, "mysql %s setDefaultConfig error: %s", dbName, err)
 			continue
@@ -63,7 +63,7 @@ func setDefaultConfig(conf *Config) error {
 }
 
 // redisConnect 连接 redis
-func redisConnect(dbName string, conf Config) error {
+func redisConnect(dbName string, conf *Config) error {
 	connList[dbName] = make(map[string]*redis.Client, 0)
 	for _, addr := range conf.Addrs {
 		client := redis.NewClient(&redis.Options{
