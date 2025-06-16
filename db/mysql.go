@@ -131,13 +131,13 @@ func dbConnect(dbName string, conf *Config) error {
 }
 
 // GetConn 获取数据库连接
-func GetConn(dbIns string) *gorm.DB {
+func GetConn(dbIns string) (*gorm.DB, error) {
 	connList.mu.RLock()
 	defer connList.mu.RUnlock()
 
 	if _, ok := connList.conns[dbIns]; !ok {
-		return nil
+		return nil, fmt.Errorf("mysql conn is not found")
 	}
 
-	return connList.conns[dbIns]
+	return connList.conns[dbIns], nil
 }
