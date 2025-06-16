@@ -77,6 +77,12 @@ func redisConnect(dbName string, conf *Config) error {
 	connList.mu.Lock()
 	defer connList.mu.Unlock()
 
+	if _, ok := connList.conns[dbName]; ok {
+		if connList.conns[dbName] != nil {
+			return nil
+		}
+	}
+
 	connList.conns[dbName] = make(map[string]*redis.Client, 0)
 	for _, addr := range conf.Addrs {
 		client := redis.NewClient(&redis.Options{
@@ -123,24 +129,4 @@ func GetConn(dbIns string) (*redis.Client, error) {
 
 	randomKey := keys[utils.RandomNum(0, len(keys)-1)]
 	return conns[randomKey], nil
-}
-
-// HealthCheck redis健康检查
-func HealthCheck() map[string]map[string]string {
-	connList.mu.RLock()
-	defer connList.mu.RUnlock()
-
-	resp := make(map[string]map[string]string)
-	for dbName, conns := range connList.conns {
-		resp[dbName] = make(map[string]string)
-		for addr, conn := range conns {
-			if _, err := conn.Ping(context.Background()).Result(); err != nil {
-				logger.ErrorWithMsg(context.Background(), TAGNAME, "redis ping db %s addr %s error %s", dbName, addr, err)
-				resp[dbName][addr] = err.Error()
-			} else {
-				resp[dbName][addr] = "succ"
-			}
-		}
-	}
-	return resp
 }

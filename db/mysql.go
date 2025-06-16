@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	gocommonlog "github.com/jessewkun/gocommon/logger"
@@ -15,31 +16,32 @@ import (
 
 const TAGNAME = "MYSQL"
 
-// connList 数据库连接列表
-var connList map[string]*gorm.DB
-var mysqlCfg map[string]*Config
+type mysqlConnections struct {
+	mu    sync.RWMutex
+	conns map[string]*gorm.DB
+}
 
-func init() {
-	connList = make(map[string]*gorm.DB)
+var connList = &mysqlConnections{
+	conns: make(map[string]*gorm.DB),
 }
 
 // InitMysql 初始化数据库
-func InitMysql(cfg map[string]*Config) {
-	mysqlCfg = cfg
+func InitMysql(cfg map[string]*Config) error {
+	var initErr error
 	for dbName, conf := range cfg {
 		err := setDefaultConfig(conf)
 		if err != nil {
-			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, "mysql %s setDefaultConfig error: %s", dbName, err)
-			continue
+			initErr = fmt.Errorf("mysql %s setDefaultConfig error: %w", dbName, err)
+			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			break
 		}
-		conn, err := dbConnect(dbName, conf)
-		if err != nil {
-			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, "connect to mysql %s faild, error: %s", dbName, err)
-			continue
+		if err := dbConnect(dbName, conf); err != nil {
+			initErr = fmt.Errorf("connect to mysql %s faild, error: %w", dbName, err)
+			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			break
 		}
-		connList[dbName] = conn
-		gocommonlog.Info(context.Background(), TAGNAME, "connect to mysql %s succ", dbName)
 	}
+	return initErr
 }
 
 // setDefaultConfig 设置默认配置
@@ -68,10 +70,13 @@ func setDefaultConfig(conf *Config) error {
 }
 
 // dbConnect 连接数据库
-func dbConnect(dbName string, conf *Config) (*gorm.DB, error) {
-	if _, ok := connList[dbName]; ok {
-		if connList[dbName] != nil {
-			return connList[dbName], nil
+func dbConnect(dbName string, conf *Config) error {
+	connList.mu.Lock()
+	defer connList.mu.Unlock()
+
+	if _, ok := connList.conns[dbName]; ok {
+		if connList.conns[dbName] != nil {
+			return nil
 		}
 	}
 
@@ -92,7 +97,7 @@ func dbConnect(dbName string, conf *Config) (*gorm.DB, error) {
 		Logger: newMysqlLogger(slowThreshold, logLevel, conf.IgnoreRecordNotFoundError),
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// 配置读写分离
@@ -119,32 +124,20 @@ func dbConnect(dbName string, conf *Config) (*gorm.DB, error) {
 			SetMaxOpenConns(conf.MaxConn),
 	)
 
-	return dbOne, nil
+	connList.conns[dbName] = dbOne
+	gocommonlog.Info(context.Background(), TAGNAME, "connect to mysql %s succ", dbName)
+
+	return nil
 }
 
 // GetConn 获取数据库连接
 func GetConn(dbIns string) *gorm.DB {
-	if len(connList) < 1 {
-		return nil
-	}
-	if _, ok := connList[dbIns]; !ok {
+	connList.mu.RLock()
+	defer connList.mu.RUnlock()
+
+	if _, ok := connList.conns[dbIns]; !ok {
 		return nil
 	}
 
-	return connList[dbIns]
-}
-
-// mysql health check
-func HealthCheck() map[string]string {
-	resp := make(map[string]string)
-	for dbName, conf := range mysqlCfg {
-		_, err := dbConnect(dbName, conf)
-		if err != nil {
-			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, "connect to mysql %s faild, error: %s", dbName, err)
-			resp[dbName] = err.Error()
-		} else {
-			resp[dbName] = "succ"
-		}
-	}
-	return resp
+	return connList.conns[dbIns]
 }

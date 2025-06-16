@@ -14,3 +14,11 @@ type Config struct {
 	DialTimeout        int      `toml:"dial_timeout" mapstructure:"dial_timeout"`                 // 连接超时时间，单位秒
 	SlowThreshold      int      `toml:"slow_threshold" mapstructure:"slow_threshold"`             // 慢查询阈值，单位毫秒
 }
+
+// HealthStatus Redis健康状态
+type HealthStatus struct {
+	Status    string `json:"status"`    // 状态：success/error
+	Error     string `json:"error"`     // 错误信息
+	Latency   int64  `json:"latency"`   // 延迟，单位毫秒
+	Timestamp int64  `json:"timestamp"` // 检查时间戳
+}

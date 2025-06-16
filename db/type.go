@@ -17,6 +17,20 @@ type Config struct {
 	IsLog                     bool     `toml:"is_log" mapstructure:"is_log"`                                               // 是否记录日志  日志级别为info
 }
 
+// HealthStatus MySQL健康状态
+type HealthStatus struct {
+	Status    string `json:"status"`     // 状态：success/error
+	Error     string `json:"error"`      // 错误信息
+	Latency   int64  `json:"latency"`    // 延迟，单位毫秒
+	Timestamp int64  `json:"timestamp"`  // 检查时间戳
+	MaxOpen   int    `json:"max_open"`   // 最大连接数
+	Open      int    `json:"open"`       // 当前打开连接数
+	InUse     int    `json:"in_use"`     // 正在使用连接数
+	Idle      int    `json:"idle"`       // 空闲连接数
+	WaitCount int64  `json:"wait_count"` // 等待连接数
+	WaitTime  int64  `json:"wait_time"`  // 等待时间，单位纳秒
+}
+
 type mysqlLogger struct {
 	SlowThreshold             time.Duration   // 慢查询阈值
 	LogLevel                  logger.LogLevel // 日志级别
