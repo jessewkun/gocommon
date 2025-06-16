@@ -9,7 +9,20 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-type RedisHook struct{}
+// RedisHook Redis钩子
+type RedisHook struct {
+	slowThreshold time.Duration // 慢查询阈值
+}
+
+// NewRedisHook 创建Redis钩子
+func newRedisHook(slowThreshold time.Duration) *RedisHook {
+	if slowThreshold == 0 {
+		slowThreshold = 100 * time.Millisecond
+	}
+	return &RedisHook{
+		slowThreshold: slowThreshold,
+	}
+}
 
 func (h *RedisHook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (context.Context, error) {
 	ctx = context.WithValue(ctx, "redis_start_time", time.Now())
@@ -19,10 +32,25 @@ func (h *RedisHook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (context
 func (h *RedisHook) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 	startTime := ctx.Value("redis_start_time").(time.Time)
 	duration := time.Since(startTime)
-	logger.InfoWithField(ctx, TAGNAME, "AfterProcess", map[string]interface{}{
-		"cmd":      cmd,
+
+	fields := map[string]interface{}{
+		"cmd":      cmd.String(),
 		"duration": duration,
-	})
+		"status":   "success",
+	}
+
+	if cmd.Err() != nil {
+		fields["status"] = "error"
+		fields["error"] = cmd.Err().Error()
+	}
+
+	// 记录慢查询
+	if duration > h.slowThreshold {
+		logger.WarnWithField(ctx, TAGNAME, "REDIS_SLOW_QUERY", fields)
+	} else {
+		logger.InfoWithField(ctx, TAGNAME, "REDIS_QUERY", fields)
+	}
+
 	return nil
 }
 
@@ -34,9 +62,36 @@ func (h *RedisHook) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cmde
 func (h *RedisHook) AfterProcessPipeline(ctx context.Context, cmds []redis.Cmder) error {
 	startTime := ctx.Value("redis_start_time").(time.Time)
 	duration := time.Since(startTime)
-	logger.InfoWithField(ctx, TAGNAME, "AfterProcessPipeline", map[string]interface{}{
-		"cmd":      cmds,
-		"duration": duration,
-	})
+
+	// 统计成功和失败的命令数
+	successCount := 0
+	errorCount := 0
+	for _, cmd := range cmds {
+		if cmd.Err() != nil {
+			errorCount++
+		} else {
+			successCount++
+		}
+	}
+
+	fields := map[string]interface{}{
+		"cmd_count":     len(cmds),
+		"success_count": successCount,
+		"error_count":   errorCount,
+		"duration":      duration,
+		"status":        "success",
+	}
+
+	if errorCount > 0 {
+		fields["status"] = "partial_error"
+	}
+
+	// 记录慢查询
+	if duration > h.slowThreshold {
+		logger.WarnWithField(ctx, TAGNAME, "REDIS_SLOW_PIPELINE", fields)
+	} else {
+		logger.InfoWithField(ctx, TAGNAME, "REDIS_PIPELINE", fields)
+	}
+
 	return nil
 }

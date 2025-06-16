@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jessewkun/gocommon/logger"
@@ -14,31 +15,37 @@ import (
 
 const TAGNAME = "REDIS"
 
-var connList map[string]map[string]*redis.Client
+type redisConnections struct {
+	mu    sync.RWMutex
+	conns map[string]map[string]*redis.Client
+}
 
-func init() {
-	connList = make(map[string]map[string]*redis.Client)
+var connList = &redisConnections{
+	conns: make(map[string]map[string]*redis.Client),
 }
 
 // InitRedis 初始化redis
-func InitRedis(cfg map[string]*Config) {
+func InitRedis(cfg map[string]*Config) error {
+	var initErr error
 	for dbName, conf := range cfg {
-		err := setDefaultConfig(conf)
-		if err != nil {
-			logger.ErrorWithMsg(context.Background(), TAGNAME, "mysql %s setDefaultConfig error: %s", dbName, err)
-			continue
+		if err := setDefaultConfig(conf); err != nil {
+			initErr = fmt.Errorf("redis %s setDefaultConfig error: %w", dbName, err)
+			logger.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			break
 		}
 		if err := redisConnect(dbName, conf); err != nil {
-			logger.ErrorWithMsg(context.Background(), TAGNAME, "connect to redis %s error %s", dbName, err)
-			continue
+			initErr = fmt.Errorf("connect to redis %s error: %w", dbName, err)
+			logger.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			break
 		}
 	}
+	return initErr
 }
 
 // setDefaultConfig 设置默认配置
 func setDefaultConfig(conf *Config) error {
 	if len(conf.Addrs) < 1 {
-		return errors.New(fmt.Sprintf("redis addrs is empty"))
+		return errors.New("redis addrs is empty")
 	}
 	if conf.PoolSize == 0 {
 		conf.PoolSize = 500
@@ -58,13 +65,19 @@ func setDefaultConfig(conf *Config) error {
 	if conf.DialTimeout == 0 {
 		conf.DialTimeout = 2
 	}
+	if conf.SlowThreshold == 0 {
+		conf.SlowThreshold = 200
+	}
 
 	return nil
 }
 
 // redisConnect 连接 redis
 func redisConnect(dbName string, conf *Config) error {
-	connList[dbName] = make(map[string]*redis.Client, 0)
+	connList.mu.Lock()
+	defer connList.mu.Unlock()
+
+	connList.conns[dbName] = make(map[string]*redis.Client, 0)
 	for _, addr := range conf.Addrs {
 		client := redis.NewClient(&redis.Options{
 			Addr:               addr,
@@ -78,39 +91,47 @@ func redisConnect(dbName string, conf *Config) error {
 			DialTimeout:        time.Duration(conf.DialTimeout) * time.Second,
 		})
 		if conf.IsLog {
-			client.AddHook(&RedisHook{})
+			client.AddHook(newRedisHook(time.Duration(conf.SlowThreshold) * time.Millisecond))
 		}
-		connList[dbName][addr] = client
+		connList.conns[dbName][addr] = client
 		logger.Info(context.Background(), TAGNAME, "connect to redis %s addr %s succ", dbName, addr)
 	}
 	return nil
 }
 
-// GetConn 获得redis
-func GetConn(dbIns string) *redis.Client {
-	if len(connList) < 1 {
-		return nil
-	}
-	if _, ok := connList[dbIns]; !ok {
-		return nil
+// GetConn 获得redis连接
+func GetConn(dbIns string) (*redis.Client, error) {
+	connList.mu.RLock()
+	defer connList.mu.RUnlock()
+
+	if len(connList.conns) < 1 {
+		return nil, errors.New("redis connList is empty")
 	}
 
-	keys := make([]string, 0, len(connList[dbIns]))
-	for key := range connList[dbIns] {
+	conns, ok := connList.conns[dbIns]
+	if !ok {
+		return nil, errors.New("redis conn is not found")
+	}
+
+	keys := make([]string, 0, len(conns))
+	for key := range conns {
 		keys = append(keys, key)
 	}
 	if len(keys) == 0 {
-		return nil
+		return nil, errors.New("redis conn is empty")
 	}
 
 	randomKey := keys[utils.RandomNum(0, len(keys)-1)]
-	return connList[dbIns][randomKey]
+	return conns[randomKey], nil
 }
 
-// redis health check
+// HealthCheck redis健康检查
 func HealthCheck() map[string]map[string]string {
+	connList.mu.RLock()
+	defer connList.mu.RUnlock()
+
 	resp := make(map[string]map[string]string)
-	for dbName, conns := range connList {
+	for dbName, conns := range connList.conns {
 		resp[dbName] = make(map[string]string)
 		for addr, conn := range conns {
 			if _, err := conn.Ping(context.Background()).Result(); err != nil {

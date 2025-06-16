@@ -12,4 +12,5 @@ type Config struct {
 	MinIdleConns       int      `toml:"min_idle_conns" mapstructure:"min_idle_conns"`             // 最小空闲连接数
 	MaxRetries         int      `toml:"max_retries" mapstructure:"max_retries"`                   // 最大重试次数
 	DialTimeout        int      `toml:"dial_timeout" mapstructure:"dial_timeout"`                 // 连接超时时间，单位秒
+	SlowThreshold      int      `toml:"slow_threshold" mapstructure:"slow_threshold"`             // 慢查询阈值，单位毫秒
 }
