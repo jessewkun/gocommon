@@ -24,6 +24,27 @@ var (
 	once     sync.Once
 )
 
+// LogLevel 日志级别
+type LogLevel string
+
+const (
+	DebugLevel LogLevel = "debug"
+	InfoLevel  LogLevel = "info"
+	WarnLevel  LogLevel = "warn"
+	ErrorLevel LogLevel = "error"
+	PanicLevel LogLevel = "panic"
+	FatalLevel LogLevel = "fatal"
+)
+
+// LogEntry 日志条目
+type LogEntry struct {
+	Level   LogLevel
+	Tag     string
+	Message string
+	Fields  map[string]interface{}
+	Error   error
+}
+
 // 初始化系统信息
 func initSystemInfo() {
 	once.Do(func() {
@@ -31,10 +52,12 @@ func initSystemInfo() {
 		hostname, err = os.Hostname()
 		if err != nil {
 			hostname = "unknown"
+			fmt.Printf("Failed to get hostname: %v\n", err)
 		}
 		localIP, err = utils.GetLocalIP()
 		if err != nil {
 			localIP = "unknown"
+			fmt.Printf("Failed to get local IP: %v\n", err)
 		}
 	})
 }
@@ -43,10 +66,15 @@ func Zap() *zap.Logger {
 	return logzap
 }
 
-func InitLogger(cfg *Config) {
+func InitLogger(cfg *Config) error {
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("invalid logger config: %v", err)
+	}
+
 	initSystemInfo()
 	logcfg = *cfg
 	logzap = zap.New(initCore(), zap.AddCallerSkip(1), zap.AddCaller())
+	return nil
 }
 
 func initCore() zapcore.Core {
@@ -105,119 +133,136 @@ func formatField(c context.Context, tag string) []zapcore.Field {
 	return fields
 }
 
-// Info log
+// log 统一的日志记录函数
+func log(c context.Context, entry LogEntry) {
+	if logcfg.Closed {
+		return
+	}
+
+	fields := formatField(c, entry.Tag)
+
+	// 添加自定义字段
+	for k, v := range entry.Fields {
+		fields = append(fields, zap.Any(k, v))
+	}
+
+	// 添加错误信息
+	if entry.Error != nil {
+		fields = append(fields, zap.Error(entry.Error))
+	}
+
+	// 记录日志
+	switch entry.Level {
+	case DebugLevel:
+		logzap.Debug(entry.Message, fields...)
+	case InfoLevel:
+		logzap.Info(entry.Message, fields...)
+	case WarnLevel:
+		logzap.Warn(entry.Message, fields...)
+	case ErrorLevel:
+		logzap.Error(entry.Message, fields...)
+	case PanicLevel:
+		logzap.Panic(entry.Message, fields...)
+	case FatalLevel:
+		logzap.Fatal(entry.Message, fields...)
+	}
+
+	// 发送报警
+	SendAlarm(c, string(entry.Level), entry.Tag, entry.Message)
+}
+
+// Info 记录信息日志
 func Info(c context.Context, tag string, msg string, args ...interface{}) {
-	if logcfg.Closed {
-		return
-	}
-	msg = fmt.Sprintf(msg, args...)
-	fields := formatField(c, tag)
-	logzap.Info(msg, fields...)
-	SendAlarm(c, "info", tag, msg)
+	log(c, LogEntry{
+		Level:   InfoLevel,
+		Tag:     tag,
+		Message: fmt.Sprintf(msg, args...),
+	})
 }
 
-// InfoWithField log
-func InfoWithField(c context.Context, tag string, msg string, field map[string]interface{}) {
-	if logcfg.Closed {
-		return
-	}
-	fields := formatField(c, tag)
-	for k, v := range field {
-		fields = append(fields, zap.Any(k, v))
-	}
-	logzap.Info(msg, fields...)
-	SendAlarm(c, "info", tag, msg)
+// InfoWithField 记录带字段的信息日志
+func InfoWithField(c context.Context, tag string, msg string, fields map[string]interface{}) {
+	log(c, LogEntry{
+		Level:   InfoLevel,
+		Tag:     tag,
+		Message: msg,
+		Fields:  fields,
+	})
 }
 
-// Error log
+// Error 记录错误日志
 func Error(c context.Context, tag string, err error) {
-	if logcfg.Closed {
-		return
-	}
-	fields := formatField(c, tag)
-	logzap.Error(err.Error(), fields...)
-	SendAlarm(c, "error", tag, err.Error())
+	log(c, LogEntry{
+		Level:   ErrorLevel,
+		Tag:     tag,
+		Message: err.Error(),
+		Error:   err,
+	})
 }
 
-// ErrorWithMsg log
+// ErrorWithMsg 记录带消息的错误日志
 func ErrorWithMsg(c context.Context, tag string, msg string, args ...interface{}) {
-	if logcfg.Closed {
-		return
-	}
-	msg = fmt.Sprintf(msg, args...)
-	fields := formatField(c, tag)
-	logzap.Error(msg, fields...)
-	SendAlarm(c, "error", tag, msg)
+	log(c, LogEntry{
+		Level:   ErrorLevel,
+		Tag:     tag,
+		Message: fmt.Sprintf(msg, args...),
+	})
 }
 
-// ErrorWithField log
-func ErrorWithField(c context.Context, tag string, msg string, field map[string]interface{}) {
-	if logcfg.Closed {
-		return
-	}
-	fields := formatField(c, tag)
-	for k, v := range field {
-		fields = append(fields, zap.Any(k, v))
-	}
-	logzap.Error(msg, fields...)
-	SendAlarm(c, "error", tag, msg)
+// ErrorWithField 记录带字段的错误日志
+func ErrorWithField(c context.Context, tag string, msg string, fields map[string]interface{}) {
+	log(c, LogEntry{
+		Level:   ErrorLevel,
+		Tag:     tag,
+		Message: msg,
+		Fields:  fields,
+	})
 }
 
-// Debug log
+// Debug 记录调试日志
 func Debug(c context.Context, tag string, msg string, args ...interface{}) {
-	if logcfg.Closed {
-		return
-	}
-	msg = fmt.Sprintf(msg, args...)
-	fields := formatField(c, tag)
-	logzap.Debug(msg, fields...)
-	SendAlarm(c, "debug", tag, msg)
+	log(c, LogEntry{
+		Level:   DebugLevel,
+		Tag:     tag,
+		Message: fmt.Sprintf(msg, args...),
+	})
 }
 
-// Warn log
+// Warn 记录警告日志
 func Warn(c context.Context, tag string, msg string, args ...interface{}) {
-	if logcfg.Closed {
-		return
-	}
-	msg = fmt.Sprintf(msg, args...)
-	fields := formatField(c, tag)
-	logzap.Warn(msg, fields...)
-	SendAlarm(c, "warn", tag, msg)
+	log(c, LogEntry{
+		Level:   WarnLevel,
+		Tag:     tag,
+		Message: fmt.Sprintf(msg, args...),
+	})
 }
 
-// WarnWithField log
-func WarnWithField(c context.Context, tag string, msg string, field map[string]interface{}) {
-	if logcfg.Closed {
-		return
-	}
-	fields := formatField(c, tag)
-	for k, v := range field {
-		fields = append(fields, zap.Any(k, v))
-	}
-	logzap.Warn(msg, fields...)
-	SendAlarm(c, "warn", tag, msg)
+// WarnWithField 记录带字段的警告日志
+func WarnWithField(c context.Context, tag string, msg string, fields map[string]interface{}) {
+	log(c, LogEntry{
+		Level:   WarnLevel,
+		Tag:     tag,
+		Message: msg,
+		Fields:  fields,
+	})
 }
 
-// Panic log
+// Panic 记录紧急日志
 func Panic(c context.Context, tag string, msg string, args ...interface{}) {
-	if logcfg.Closed {
-		return
-	}
-	msg = fmt.Sprintf(msg, args...)
-	fields := formatField(c, tag)
-	logzap.Panic(msg, fields...)
-	SendAlarm(c, "panic", tag, msg)
+	log(c, LogEntry{
+		Level:   PanicLevel,
+		Tag:     tag,
+		Message: fmt.Sprintf(msg, args...),
+	})
 }
 
-// Fatal log
+// Fatal 记录致命日志
 func Fatal(c context.Context, tag string, msg string, args ...interface{}) {
-	if logcfg.Closed {
-		return
-	}
-	msg = fmt.Sprintf(msg, args...)
-	fields := formatField(c, tag)
-	logzap.Fatal(msg, fields...)
-	SendAlarm(c, "fatal", tag, msg)
+	log(c, LogEntry{
+		Level:   FatalLevel,
+		Tag:     tag,
+		Message: fmt.Sprintf(msg, args...),
+	})
 }
 
 func SendAlarm(c context.Context, level string, tag string, msg string) {
