@@ -23,7 +23,7 @@ type User struct {
 // ExampleMongoDBUsage MongoDB 使用示例
 func ExampleMongoDBUsage() {
 	// 1. 初始化 MongoDB 配置
-	mongoConfig := map[string]*MongoConfig{
+	mongoConfig := map[string]*Config{
 		"default": {
 			Uris:                   []string{"mongodb://localhost:27017"},
 			MaxPoolSize:            100,

@@ -26,7 +26,7 @@ var mongoConnList = &mongoConnections{
 }
 
 // InitMongoDB 初始化 MongoDB 连接
-func InitMongoDB(cfg map[string]*MongoConfig) error {
+func InitMongoDB(cfg map[string]*Config) error {
 	var initErr error
 	for dbName, conf := range cfg {
 		err := setMongoDefaultConfig(conf)
@@ -45,7 +45,7 @@ func InitMongoDB(cfg map[string]*MongoConfig) error {
 }
 
 // setMongoDefaultConfig 设置 MongoDB 默认配置
-func setMongoDefaultConfig(conf *MongoConfig) error {
+func setMongoDefaultConfig(conf *Config) error {
 	if len(conf.Uris) < 1 {
 		return fmt.Errorf("mongodb uris is invalid")
 	}
@@ -78,7 +78,7 @@ func setMongoDefaultConfig(conf *MongoConfig) error {
 }
 
 // mongoConnect 连接 MongoDB
-func mongoConnect(dbName string, conf *MongoConfig) error {
+func mongoConnect(dbName string, conf *Config) error {
 	mongoConnList.mu.Lock()
 	defer mongoConnList.mu.Unlock()
 

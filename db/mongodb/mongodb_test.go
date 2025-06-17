@@ -47,7 +47,7 @@ type TestOrder struct {
 
 func TestInitMongoDB(t *testing.T) {
 	// 测试配置
-	config := map[string]*MongoConfig{
+	config := map[string]*Config{
 		"test": {
 			Uris:                   []string{"mongodb://localhost:27017"},
 			IsLog:                  false, // 测试时关闭日志
@@ -68,13 +68,13 @@ func TestInitMongoDB(t *testing.T) {
 
 func TestSetMongoDefaultConfig(t *testing.T) {
 	// 测试空配置
-	config := &MongoConfig{}
+	config := &Config{}
 	err := setMongoDefaultConfig(config)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "mongodb uris is invalid")
 
 	// 测试有效配置
-	config = &MongoConfig{
+	config = &Config{
 		Uris: []string{"mongodb://localhost:27017"},
 	}
 	err = setMongoDefaultConfig(config)
@@ -87,7 +87,7 @@ func TestSetMongoDefaultConfig(t *testing.T) {
 	assert.Equal(t, 30, config.SocketTimeout)
 
 	// 测试自定义配置
-	config = &MongoConfig{
+	config = &Config{
 		Uris:                   []string{"mongodb://localhost:27017"},
 		MaxPoolSize:            200,
 		MinPoolSize:            10,
@@ -144,24 +144,24 @@ func TestHealthCheck(t *testing.T) {
 func TestConfigValidation(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  *MongoConfig
+		config  *Config
 		wantErr bool
 	}{
 		{
 			name:    "empty uris",
-			config:  &MongoConfig{},
+			config:  &Config{},
 			wantErr: true,
 		},
 		{
 			name: "valid config",
-			config: &MongoConfig{
+			config: &Config{
 				Uris: []string{"mongodb://localhost:27017"},
 			},
 			wantErr: false,
 		},
 		{
 			name: "replica set config",
-			config: &MongoConfig{
+			config: &Config{
 				Uris: []string{"mongodb://localhost:27017,localhost:27018,localhost:27019"},
 			},
 			wantErr: false,
@@ -182,7 +182,7 @@ func TestConfigValidation(t *testing.T) {
 
 // 测试连接池配置
 func TestConnectionPoolConfig(t *testing.T) {
-	config := &MongoConfig{
+	config := &Config{
 		Uris:            []string{"mongodb://localhost:27017"},
 		MaxPoolSize:     200,
 		MinPoolSize:     20,
@@ -198,7 +198,7 @@ func TestConnectionPoolConfig(t *testing.T) {
 
 // 测试超时配置
 func TestTimeoutConfig(t *testing.T) {
-	config := &MongoConfig{
+	config := &Config{
 		Uris:                   []string{"mongodb://localhost:27017"},
 		ServerSelectionTimeout: 60,
 		ConnectTimeout:         20,
@@ -214,7 +214,7 @@ func TestTimeoutConfig(t *testing.T) {
 
 // 测试日志配置
 func TestLoggingConfig(t *testing.T) {
-	config := &MongoConfig{
+	config := &Config{
 		Uris:  []string{"mongodb://localhost:27017"},
 		IsLog: true,
 	}
@@ -264,7 +264,7 @@ func TestConcurrencySafety(t *testing.T) {
 // 测试错误处理
 func TestErrorHandling(t *testing.T) {
 	// 测试空的URIs
-	config := &MongoConfig{
+	config := &Config{
 		Uris: []string{},
 	}
 
@@ -273,7 +273,7 @@ func TestErrorHandling(t *testing.T) {
 	assert.Contains(t, err.Error(), "mongodb uris is invalid")
 
 	// 测试无效的URI格式
-	config = &MongoConfig{
+	config = &Config{
 		Uris: []string{"invalid-uri"},
 	}
 
@@ -384,7 +384,7 @@ func TestObjectIDOperations(t *testing.T) {
 // 测试边界值
 func TestBoundaryValues(t *testing.T) {
 	// 测试最小连接池大小
-	config := &MongoConfig{
+	config := &Config{
 		Uris:        []string{"mongodb://localhost:27017"},
 		MaxPoolSize: 1,
 		MinPoolSize: 1,
@@ -396,7 +396,7 @@ func TestBoundaryValues(t *testing.T) {
 	assert.Equal(t, 1, config.MinPoolSize)
 
 	// 测试最大连接池大小
-	config = &MongoConfig{
+	config = &Config{
 		Uris:        []string{"mongodb://localhost:27017"},
 		MaxPoolSize: 1000,
 	}
@@ -406,7 +406,7 @@ func TestBoundaryValues(t *testing.T) {
 	assert.Equal(t, 1000, config.MaxPoolSize)
 
 	// 测试零值超时
-	config = &MongoConfig{
+	config = &Config{
 		Uris:                   []string{"mongodb://localhost:27017"},
 		ServerSelectionTimeout: 0,
 		ConnectTimeout:         0,
@@ -424,7 +424,7 @@ func TestBoundaryValues(t *testing.T) {
 // 测试配置验证的完整性
 func TestConfigValidationCompleteness(t *testing.T) {
 	// 测试所有字段的默认值设置
-	config := &MongoConfig{
+	config := &Config{
 		Uris: []string{"mongodb://localhost:27017"},
 	}
 
@@ -443,7 +443,7 @@ func TestConfigValidationCompleteness(t *testing.T) {
 
 // 测试配置的不可变性
 func TestConfigImmutability(t *testing.T) {
-	originalConfig := &MongoConfig{
+	originalConfig := &Config{
 		Uris:                   []string{"mongodb://localhost:27017"},
 		MaxPoolSize:            100,
 		MinPoolSize:            10,
@@ -468,7 +468,7 @@ func TestConfigImmutability(t *testing.T) {
 // 测试MongoDB特有的功能
 func TestMongoDBSpecificFeatures(t *testing.T) {
 	// 测试副本集配置
-	config := &MongoConfig{
+	config := &Config{
 		Uris: []string{"mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=rs0"},
 	}
 
@@ -477,7 +477,7 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 	assert.Contains(t, config.Uris[0], "replicaSet=rs0")
 
 	// 测试分片集群配置
-	config = &MongoConfig{
+	config = &Config{
 		Uris: []string{"mongodb://mongos1:27017,mongos2:27017,mongos3:27017"},
 	}
 
@@ -486,7 +486,7 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 	assert.Contains(t, config.Uris[0], "mongos")
 
 	// 测试认证配置
-	config = &MongoConfig{
+	config = &Config{
 		Uris: []string{"mongodb://username:password@localhost:27017/admin?authSource=admin"},
 	}
 
@@ -499,7 +499,7 @@ func TestMongoDBSpecificFeatures(t *testing.T) {
 func TestRealMongoDBOperations(t *testing.T) {
 	// t.Skip("跳过真实MongoDB操作测试，需要本地MongoDB服务")
 
-	config := map[string]*MongoConfig{
+	config := map[string]*Config{
 		"test": {
 			Uris:                   []string{"mongodb://localhost:27017"},
 			IsLog:                  false,

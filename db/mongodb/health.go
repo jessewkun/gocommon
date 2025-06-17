@@ -11,7 +11,7 @@ import (
 )
 
 // HealthCheck MongoDB 健康检查
-func HealthCheck() map[string]*MongoHealthStatus {
+func HealthCheck() map[string]*HealthStatus {
 	// 创建带超时的context
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -25,9 +25,9 @@ func HealthCheck() map[string]*MongoHealthStatus {
 	mongoConnList.mu.RUnlock()
 
 	// 执行健康检查
-	resp := make(map[string]*MongoHealthStatus)
+	resp := make(map[string]*HealthStatus)
 	for dbName, client := range connections {
-		status := &MongoHealthStatus{
+		status := &HealthStatus{
 			Timestamp: time.Now().UnixMilli(),
 		}
 
