@@ -135,7 +135,7 @@ func TestCloseMongoDB(t *testing.T) {
 
 func TestHealthCheck(t *testing.T) {
 	// 测试健康检查（没有连接时应该返回空结果）
-	healthStatus := MongoHealthCheck()
+	healthStatus := HealthCheck()
 	assert.NotNil(t, healthStatus)
 	assert.Len(t, healthStatus, 0)
 }
@@ -253,7 +253,7 @@ func TestConcurrencySafety(t *testing.T) {
 	// 并发调用 MongoHealthCheck
 	for i := 0; i < 10; i++ {
 		go func() {
-			_ = MongoHealthCheck()
+			_ = HealthCheck()
 		}()
 	}
 
@@ -296,12 +296,10 @@ func TestContextSupport(t *testing.T) {
 func TestModelDefinition(t *testing.T) {
 	// 测试用户模型
 	user := TestUser{
-		Name:      "测试用户",
-		Email:     "test@example.com",
-		Age:       25,
-		Status:    1,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Name:   "测试用户",
+		Email:  "test@example.com",
+		Age:    25,
+		Status: 1,
 	}
 
 	assert.NotEmpty(t, user.Name)
@@ -311,11 +309,9 @@ func TestModelDefinition(t *testing.T) {
 
 	// 测试订单模型
 	order := TestOrder{
-		UserID:    primitive.NewObjectID(),
-		Amount:    99.99,
-		Status:    "pending",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		UserID: primitive.NewObjectID(),
+		Amount: 99.99,
+		Status: "pending",
 	}
 
 	assert.NotEqual(t, primitive.NilObjectID, order.UserID)

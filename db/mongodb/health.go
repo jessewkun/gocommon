@@ -10,8 +10,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-// MongoHealthCheck MongoDB 健康检查
-func MongoHealthCheck() map[string]*MongoHealthStatus {
+// HealthCheck MongoDB 健康检查
+func HealthCheck() map[string]*MongoHealthStatus {
 	// 创建带超时的context
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

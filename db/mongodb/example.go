@@ -170,8 +170,8 @@ func ExampleMongoDBUsage() {
 
 	// 10. 聚合查询
 	pipeline := mongo.Pipeline{
-		{{"$match", bson.M{"age": bson.M{"$gte": 25}}}},
-		{{"$group", bson.M{
+		{{Key: "$match", Value: bson.M{"age": bson.M{"$gte": 25}}}},
+		{{Key: "$group", Value: bson.M{
 			"_id":    nil,
 			"avgAge": bson.M{"$avg": "$age"},
 			"count":  bson.M{"$sum": 1},
@@ -193,7 +193,7 @@ func ExampleMongoDBUsage() {
 	}
 
 	// 11. 健康检查
-	healthStatus := MongoHealthCheck()
+	healthStatus := HealthCheck()
 	for dbName, status := range healthStatus {
 		fmt.Printf("MongoDB %s health status: %+v\n", dbName, status)
 	}
