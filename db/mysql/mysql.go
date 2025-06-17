@@ -1,4 +1,4 @@
-package db
+package mysql
 
 import (
 	"context"
@@ -140,4 +140,34 @@ func GetConn(dbIns string) (*gorm.DB, error) {
 	}
 
 	return connList.conns[dbIns], nil
+}
+
+// CloseMysql 关闭 MySQL 连接
+func CloseMysql() error {
+	connList.mu.Lock()
+	defer connList.mu.Unlock()
+
+	var lastErr error
+	for dbName, db := range connList.conns {
+		if db != nil {
+			sqlDB, err := db.DB()
+			if err != nil {
+				lastErr = fmt.Errorf("get sql.DB for mysql %s failed: %w", dbName, err)
+				gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, lastErr.Error())
+				continue
+			}
+
+			if err := sqlDB.Close(); err != nil {
+				lastErr = fmt.Errorf("close mysql %s failed: %w", dbName, err)
+				gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, lastErr.Error())
+			} else {
+				gocommonlog.Info(context.Background(), TAGNAME, "close mysql %s succ", dbName)
+			}
+		}
+	}
+
+	// 清空连接列表
+	connList.conns = make(map[string]*gorm.DB)
+
+	return lastErr
 }

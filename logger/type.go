@@ -11,7 +11,7 @@ import (
 // Config 日志配置
 type Config struct {
 	Path                 string   `toml:"path" mapstructure:"path"`                                   // ⽇志⽂件路径
-	Closed               bool     `toml:"closed" mapstructure:"closed"`                               // 是否关闭日志
+	Closed               bool     `toml:"closed" mapstructure:"closed"`                               // 是否关闭日志，注意该配置是全局配置，一旦关闭则所有日志都不会输出
 	MaxSize              int      `toml:"max_size" mapstructure:"max_size"`                           // 单位为MB,默认为100MB
 	MaxAge               int      `toml:"max_age" mapstructure:"max_age"`                             // 文件最多保存多少天
 	MaxBackup            int      `toml:"max_backup" mapstructure:"max_backup"`                       // 保留多少个备份

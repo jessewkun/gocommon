@@ -1,4 +1,4 @@
-package cache
+package redis
 
 import (
 	"context"
@@ -129,4 +129,29 @@ func GetConn(dbIns string) (*redis.Client, error) {
 
 	randomKey := keys[utils.RandomNum(0, len(keys)-1)]
 	return conns[randomKey], nil
+}
+
+// CloseRedis 关闭 Redis 连接
+func CloseRedis() error {
+	connList.mu.Lock()
+	defer connList.mu.Unlock()
+
+	var lastErr error
+	for dbName, conns := range connList.conns {
+		for addr, conn := range conns {
+			if conn != nil {
+				if err := conn.Close(); err != nil {
+					lastErr = fmt.Errorf("close redis %s addr %s failed: %w", dbName, addr, err)
+					logger.ErrorWithMsg(context.Background(), TAGNAME, lastErr.Error())
+				} else {
+					logger.Info(context.Background(), TAGNAME, "close redis %s addr %s succ", dbName, addr)
+				}
+			}
+		}
+	}
+
+	// 清空连接列表
+	connList.conns = make(map[string]map[string]*redis.Client)
+
+	return lastErr
 }

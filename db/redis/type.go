@@ -1,4 +1,4 @@
-package cache
+package redis
 
 // Config redis config
 type Config struct {
