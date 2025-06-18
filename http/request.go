@@ -145,7 +145,7 @@ func (hc *Client) UploadWithFilePath(ctx context.Context, req UploadWithFilePath
 
 	request := hc.Client.R().
 		SetContext(ctx).
-		SetFile(req.FileName, req.FilePath).
+		SetFile(req.Param, req.FilePath).
 		SetFormData(req.Data)
 
 	// 设置请求头

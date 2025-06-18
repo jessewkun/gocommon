@@ -32,6 +32,12 @@ func NewClient(opt Option) *Client {
 		if opt.RetryMaxWaitTime > 0 {
 			client.SetRetryMaxWaitTime(opt.RetryMaxWaitTime)
 		}
+		// 根据配置决定是否对5xx状态码进行重试
+		if opt.RetryWith5xxStatus {
+			client.AddRetryCondition(func(r *resty.Response, err error) bool {
+				return r.StatusCode() >= 500 && r.StatusCode() < 600
+			})
+		}
 	}
 
 	if opt.IsLog {

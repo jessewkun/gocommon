@@ -9,16 +9,18 @@ import (
 )
 
 type Option struct {
-	Headers          map[string]string // 请求头
-	Timeout          time.Duration     // 超时时间（秒）
-	Retry            int               // 最大重试次数
-	RetryWaitTime    time.Duration     // 重试等待时间
-	RetryMaxWaitTime time.Duration     // 最大重试等待时间
-	IsLog            bool              // 是否记录日志
+	Headers            map[string]string // 请求头
+	Timeout            time.Duration     // 超时时间（秒）
+	Retry              int               // 最大重试次数
+	RetryWaitTime      time.Duration     // 重试等待时间
+	RetryMaxWaitTime   time.Duration     // 最大重试等待时间
+	RetryWith5xxStatus bool              // 是否对5xx状态码进行重试
+	IsLog              bool              // 是否记录日志
 }
 
 func (o *Option) String() string {
-	return fmt.Sprintf("Headers: %v, Timeout: %s, RetryCount: %d, RetryWaitTime: %s, RetryMaxWaitTime: %s, IsLog: %v", o.Headers, o.Timeout, o.Retry, o.RetryWaitTime, o.RetryMaxWaitTime, o.IsLog)
+	return fmt.Sprintf("Headers: %v, Timeout: %s, RetryCount: %d, RetryWaitTime: %s, RetryMaxWaitTime: %s, RetryWith5xxStatus: %v, IsLog: %v",
+		o.Headers, o.Timeout, o.Retry, o.RetryWaitTime, o.RetryMaxWaitTime, o.RetryWith5xxStatus, o.IsLog)
 }
 
 // Response
