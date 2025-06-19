@@ -29,5 +29,5 @@ var RateLimiterError = common.CustomError{Code: 1100, Err: errors.New("Too many 
 
 // newDefaultError 创建默认错误
 func newDefaultError(err error) common.CustomError {
-	return common.NewCustomError(DEFAULT_ERROR_CODE, err)
+	return common.CustomError{Code: DEFAULT_ERROR_CODE, Err: err}
 }

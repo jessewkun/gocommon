@@ -96,3 +96,12 @@ func TestAesCbc_Decode(t *testing.T) {
 		})
 	}
 }
+
+func TestHMACSHA1(t *testing.T) {
+	msg := "hello"
+	key := "key"
+	mac := HMACSHA1(msg, key)
+	if len(mac) == 0 {
+		t.Error("HMACSHA1 返回值为空")
+	}
+}
