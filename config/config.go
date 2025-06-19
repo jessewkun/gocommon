@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/jessewkun/gocommon/alarm"
+	"github.com/jessewkun/gocommon/db/elasticsearch"
 	"github.com/jessewkun/gocommon/db/mongodb"
 	"github.com/jessewkun/gocommon/db/mysql"
 	"github.com/jessewkun/gocommon/db/redis"
@@ -12,29 +13,31 @@ import (
 
 // 项目通用配置
 type BaseConfig struct {
-	Mode    string                     `toml:"mode" mapstructure:"mode"`       // 运行模式, debug 开发, release 生产, test 测试
-	Port    string                     `toml:"port" mapstructure:"port"`       // 服务端口, 默认 :8000
-	Domain  string                     `toml:"domain" mapstructure:"domain"`   // 服务域名, 默认 http://localhost:8000
-	Debug   *debug.Config              `toml:"debug" mapstructure:"debug"`     // 调试配置
-	Log     *logger.Config             `toml:"log" mapstructure:"log"`         // 日志配置
-	Mysql   map[string]*mysql.Config   `toml:"mysql" mapstructure:"mysql"`     // mysql 配置
-	Redis   map[string]*redis.Config   `toml:"redis" mapstructure:"redis"`     // redis 配置
-	Mongodb map[string]*mongodb.Config `toml:"mongodb" mapstructure:"mongodb"` // mongodb 配置
-	Alarm   *alarm.Config              `toml:"alarm" mapstructure:"alarm"`     // 报警配置
+	Mode          string                           `toml:"mode" mapstructure:"mode"`                   // 运行模式, debug 开发, release 生产, test 测试
+	Port          string                           `toml:"port" mapstructure:"port"`                   // 服务端口, 默认 :8000
+	Domain        string                           `toml:"domain" mapstructure:"domain"`               // 服务域名, 默认 http://localhost:8000
+	Debug         *debug.Config                    `toml:"debug" mapstructure:"debug"`                 // 调试配置
+	Log           *logger.Config                   `toml:"log" mapstructure:"log"`                     // 日志配置
+	Mysql         map[string]*mysql.Config         `toml:"mysql" mapstructure:"mysql"`                 // mysql 配置
+	Redis         map[string]*redis.Config         `toml:"redis" mapstructure:"redis"`                 // redis 配置
+	Mongodb       map[string]*mongodb.Config       `toml:"mongodb" mapstructure:"mongodb"`             // mongodb 配置
+	Elasticsearch map[string]*elasticsearch.Config `toml:"elasticsearch" mapstructure:"elasticsearch"` // elasticsearch 配置
+	Alarm         *alarm.Config                    `toml:"alarm" mapstructure:"alarm"`                 // 报警配置
 }
 
 // DefaultConfig 返回默认配置
 func DefaultConfig() *BaseConfig {
 	return &BaseConfig{
-		Mode:    "debug",
-		Port:    ":8000",
-		Domain:  "http://localhost:8000",
-		Debug:   debug.DefaultConfig(),
-		Log:     logger.DefaultConfig(),
-		Mysql:   make(map[string]*mysql.Config),
-		Redis:   make(map[string]*redis.Config),
-		Mongodb: make(map[string]*mongodb.Config),
-		Alarm:   alarm.DefaultConfig(),
+		Mode:          "debug",
+		Port:          ":8000",
+		Domain:        "http://localhost:8000",
+		Debug:         debug.DefaultConfig(),
+		Log:           logger.DefaultConfig(),
+		Mysql:         make(map[string]*mysql.Config),
+		Redis:         make(map[string]*redis.Config),
+		Mongodb:       make(map[string]*mongodb.Config),
+		Elasticsearch: make(map[string]*elasticsearch.Config),
+		Alarm:         alarm.DefaultConfig(),
 	}
 }
 
