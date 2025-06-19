@@ -20,7 +20,7 @@ var moduleCache sync.Map
 func InitDebug(flag string) DebugFunc {
 	return func(c context.Context, format string, v ...interface{}) {
 		if IsDebug(flag) {
-			hookPrint(c, format, v)
+			hookPrint(c, format, v...)
 		}
 	}
 }
