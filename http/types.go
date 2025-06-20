@@ -6,7 +6,29 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/jessewkun/gocommon/config"
+	"github.com/spf13/viper"
 )
+
+// Config 是 http 模块的配置结构体
+type Config struct {
+	TransparentParameter []string `mapstructure:"transparent_parameter"`
+	IsTraceLog           bool     `mapstructure:"is_trace_log"`
+}
+
+// Reload 重新加载 http 配置
+func (c *Config) Reload(v *viper.Viper) {
+	if err := v.UnmarshalKey("http", c); err != nil {
+		fmt.Printf("failed to reload http config: %v\n", err)
+	}
+	fmt.Printf("http config reload success, config: %+v\n", c)
+}
+
+var Cfg = &Config{}
+
+func init() {
+	config.Register("http", Cfg)
+}
 
 type Option struct {
 	Headers            map[string]string // 请求头

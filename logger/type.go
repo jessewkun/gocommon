@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/jessewkun/gocommon/config"
 	"github.com/jessewkun/gocommon/utils"
 )
 
@@ -17,6 +18,13 @@ type Config struct {
 	MaxBackup            int      `toml:"max_backup" mapstructure:"max_backup"`                       // 保留多少个备份
 	TransparentParameter []string `toml:"transparent_parameter" mapstructure:"transparent_parameter"` // 透传参数，继承上下文中的参数
 	AlarmLevel           string   `toml:"alarm_level" mapstructure:"alarm_level"`                     // 报警级别, warn 警告, error 错误
+}
+
+// Cfg is the configuration instance for the logger package.
+var Cfg = DefaultConfig()
+
+func init() {
+	config.Register("log", Cfg)
 }
 
 // Validate 验证配置是否合法
@@ -51,6 +59,7 @@ func (c *Config) Validate() error {
 	return nil
 }
 
+// DefaultConfig ...
 func DefaultConfig() *Config {
 	return &Config{
 		Path:                 "",

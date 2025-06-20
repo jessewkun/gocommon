@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -14,6 +16,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// logTestMutex is used to ensure that tests modifying the global logger config do not run in parallel.
+var logTestMutex sync.Mutex
 
 // 测试数据结构
 type TestUser struct {
@@ -664,45 +669,56 @@ func contains(s, substr string) bool {
 }
 
 func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(s, substr)
 }
 
-// 测试日志功能
+// 测试日志记录功能
 func TestClient_Logging(t *testing.T) {
-	// 初始化logger以避免空指针异常
-	err := logger.InitLogger(&logger.Config{
-		Path:                 "test.log",
-		Closed:               false,
-		MaxSize:              100,
-		MaxAge:               30,
-		MaxBackup:            10,
-		TransparentParameter: []string{},
-		AlarmLevel:           "warn",
-	})
+	logTestMutex.Lock()
+	defer logTestMutex.Unlock()
+
+	// --- Setup ---
+	originalLogCfg := logger.Cfg
+	logger.Cfg = logger.DefaultConfig() // Start with a fresh default config
+	logger.Cfg.Path = "./test.log"
+	logger.Cfg.Closed = false
+
+	err := logger.InitLogger()
 	require.NoError(t, err)
+
+	// --- Cleanup ---
+	t.Cleanup(func() {
+		logger.Cfg = originalLogCfg
+		// It might be useful to re-init with the original config if other tests depend on it
+		logger.InitLogger()
+		os.Remove("./test.log")
+	})
 
 	server := createTestServer(t)
 	defer server.Close()
 
 	client := NewClient(Option{
 		Timeout: 10 * time.Second,
-		IsLog:   true, // 启用日志
+		IsLog:   true, // 确保日志被激活
 	})
 
-	t.Run("日志记录测试", func(t *testing.T) {
+	t.Run("GET请求日志记录", func(t *testing.T) {
 		req := GetRequest{
 			URL: server.URL + "/test/get",
 		}
 
-		resp, err := client.Get(context.Background(), req)
+		// 执行请求
+		_, err := client.Get(context.Background(), req)
 		require.NoError(t, err)
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		// 由于日志是通过logger包记录的，这里主要测试功能是否正常
+
+		// 检查日志文件内容
+		logContent, err := os.ReadFile("./test.log")
+		require.NoError(t, err)
+
+		logStr := string(logContent)
+		assert.True(t, containsSubstring(logStr, "client request"), "日志应包含 'client request'")
+		assert.True(t, containsSubstring(logStr, server.URL+"/test/get"), "日志应包含请求URL")
+		assert.True(t, containsSubstring(logStr, "HTTP"), "日志应包含 'HTTP' 标签")
 	})
 }
 

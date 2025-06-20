@@ -1,6 +1,9 @@
 package elasticsearch
 
-import "github.com/elastic/go-elasticsearch/v8"
+import (
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/jessewkun/gocommon/config"
+)
 
 type Client struct {
 	ES *elasticsearch.Client
@@ -14,9 +17,15 @@ type Config struct {
 	Password  string   `toml:"password" mapstructure:"password"`
 }
 
+// Cfg is the configuration instance for the elasticsearch package.
+var Cfgs = make(map[string]*Config)
+
+func init() {
+	config.Register("elasticsearch", &Cfgs)
+}
+
 // HealthStatus ES健康状态
 // 连接数等字段可留空或为0，主要关注状态、错误、延迟、时间戳
-// 便于与 mysql/mongodb 健康检查结构统一
 type HealthStatus struct {
 	Status    string `json:"status"`    // 状态：success/error
 	Error     string `json:"error"`     // 错误信息

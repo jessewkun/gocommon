@@ -16,26 +16,26 @@ import (
 
 const TAGNAME = "MYSQL"
 
-type mysqlConnections struct {
+type Connections struct {
 	mu    sync.RWMutex
 	conns map[string]*gorm.DB
 }
 
-var connList = &mysqlConnections{
+var connList = &Connections{
 	conns: make(map[string]*gorm.DB),
 }
 
 // InitMysql 初始化数据库
-func InitMysql(cfg map[string]*Config) error {
+func InitMysql() error {
 	var initErr error
-	for dbName, conf := range cfg {
+	for dbName, conf := range Cfgs {
 		err := setDefaultConfig(conf)
 		if err != nil {
 			initErr = fmt.Errorf("mysql %s setDefaultConfig error: %w", dbName, err)
 			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
 			break
 		}
-		if err := dbConnect(dbName, conf); err != nil {
+		if err := newClient(dbName, conf); err != nil {
 			initErr = fmt.Errorf("connect to mysql %s faild, error: %w", dbName, err)
 			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
 			break
@@ -69,8 +69,8 @@ func setDefaultConfig(conf *Config) error {
 	return nil
 }
 
-// dbConnect 连接数据库
-func dbConnect(dbName string, conf *Config) error {
+// newClient 连接数据库
+func newClient(dbName string, conf *Config) error {
 	connList.mu.Lock()
 	defer connList.mu.Unlock()
 

@@ -22,8 +22,9 @@ type User struct {
 
 // ExampleMongoDBUsage MongoDB 使用示例
 func ExampleMongoDBUsage() {
-	// 1. 初始化 MongoDB 配置
-	mongoConfig := map[string]*Config{
+	// 1. 设置 MongoDB 配置
+	// 在实际应用中，这些配置通常通过配置文件加载
+	Cfgs = map[string]*Config{
 		"default": {
 			Uris:                   []string{"mongodb://localhost:27017"},
 			MaxPoolSize:            100,
@@ -51,17 +52,15 @@ func ExampleMongoDBUsage() {
 	}
 
 	// 2. 初始化 MongoDB 连接
-	if err := InitMongoDB(mongoConfig); err != nil {
+	if err := InitMongoDB(); err != nil {
 		log.Fatalf("Failed to initialize MongoDB: %v", err)
 	}
 
-	// 3. 获取数据库和集合
-	database, err := GetMongoDatabase("default", "testdb")
+	// 3. 获取集合
+	collection, err := GetMongoCollection("default", "testdb", "users")
 	if err != nil {
-		log.Fatalf("Failed to get database: %v", err)
+		log.Fatalf("Failed to get collection: %v", err)
 	}
-
-	collection := database.Collection("users")
 
 	// 4. 插入文档
 	user := User{
@@ -84,12 +83,12 @@ func ExampleMongoDBUsage() {
 	err = collection.FindOne(context.Background(), bson.M{"name": "张三"}).Decode(&foundUser)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			fmt.Println("No document found")
+			fmt.Println("No document found for name '张三'")
 		} else {
 			log.Printf("Failed to find document: %v", err)
 		}
 	} else {
-		fmt.Printf("Found user: %+v\n", foundUser)
+		fmt.Printf("Found user with name '张三': %+v\n", foundUser)
 	}
 
 	// 6. 更新文档
@@ -108,7 +107,7 @@ func ExampleMongoDBUsage() {
 	if err != nil {
 		log.Printf("Failed to update document: %v", err)
 	} else {
-		fmt.Printf("Updated %v document(s)\n", updateResult.ModifiedCount)
+		fmt.Printf("Updated %v document(s) for name '张三'\n", updateResult.ModifiedCount)
 	}
 
 	// 7. 删除文档
@@ -116,15 +115,17 @@ func ExampleMongoDBUsage() {
 	if err != nil {
 		log.Printf("Failed to delete document: %v", err)
 	} else {
-		fmt.Printf("Deleted %v document(s)\n", deleteResult.DeletedCount)
+		fmt.Printf("Deleted %v document(s) for name '张三'\n", deleteResult.DeletedCount)
 	}
 
 	// 8. 使用事务
 	client, err := GetMongoClient("default")
 	if err != nil {
-		log.Fatalf("Failed to get client: %v", err)
+		log.Fatalf("Failed to get client for transaction: %v", err)
 	}
 
+	// 事务操作需要副本集或 mongos
+	// 请确保您的 MongoDB 环境支持事务
 	err = WithTransaction(client, func(sessCtx mongo.SessionContext) error {
 		// 在事务中执行操作
 		_, err := collection.InsertOne(sessCtx, User{
@@ -149,7 +150,23 @@ func ExampleMongoDBUsage() {
 	})
 
 	if err != nil {
-		log.Printf("Transaction failed: %v", err)
+		if writeException, ok := err.(mongo.WriteException); ok {
+			// 检查是否是由于环境不支持事务导致的错误
+			isTransactionError := false
+			for _, writeError := range writeException.WriteErrors {
+				if writeError.Code == 20 { // 事务错误码
+					isTransactionError = true
+					break
+				}
+			}
+			if isTransactionError {
+				fmt.Println("Transaction failed: The current MongoDB deployment does not support transactions.")
+			} else {
+				log.Printf("Transaction failed with write exception: %v", err)
+			}
+		} else {
+			log.Printf("Transaction failed: %v", err)
+		}
 	} else {
 		fmt.Println("Transaction completed successfully")
 	}
@@ -181,25 +198,26 @@ func ExampleMongoDBUsage() {
 	cursor, err := collection.Aggregate(context.Background(), pipeline)
 	if err != nil {
 		log.Printf("Failed to execute aggregation: %v", err)
-	} else {
-		defer cursor.Close(context.Background())
-
-		var results []bson.M
-		if err = cursor.All(context.Background(), &results); err != nil {
-			log.Printf("Failed to decode aggregation results: %v", err)
-		} else {
-			fmt.Printf("Aggregation results: %+v\n", results)
-		}
 	}
+	defer cursor.Close(context.Background())
+
+	var results []bson.M
+	if err = cursor.All(context.Background(), &results); err != nil {
+		log.Printf("Failed to decode aggregation results: %v", err)
+	}
+
+	fmt.Printf("Aggregation results: %+v\n", results)
 
 	// 11. 健康检查
 	healthStatus := HealthCheck()
 	for dbName, status := range healthStatus {
-		fmt.Printf("MongoDB %s health status: %+v\n", dbName, status)
+		fmt.Printf("MongoDB '%s' health status: %+v\n", dbName, status)
 	}
 
 	// 12. 关闭连接
 	if err := CloseMongoDB(); err != nil {
 		log.Printf("Failed to close MongoDB connections: %v", err)
+	} else {
+		fmt.Println("All MongoDB connections closed successfully.")
 	}
 }

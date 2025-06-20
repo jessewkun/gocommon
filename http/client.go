@@ -3,7 +3,6 @@ package http
 import (
 	"github.com/go-resty/resty/v2"
 	"github.com/jessewkun/gocommon/logger"
-	"github.com/spf13/viper"
 )
 
 type Client struct {
@@ -40,7 +39,13 @@ func NewClient(opt Option) *Client {
 		}
 	}
 
+	// 日志逻辑现在尊重模块的配置，可以被 Option 覆盖
+	isLog := Cfg.IsTraceLog
 	if opt.IsLog {
+		isLog = true
+	}
+
+	if isLog {
 		client.OnAfterResponse(func(c *resty.Client, r *resty.Response) error {
 			ctx := r.Request.Context()
 			logger.InfoWithField(ctx, "HTTP", "client request", map[string]interface{}{
@@ -56,6 +61,6 @@ func NewClient(opt Option) *Client {
 
 	return &Client{
 		Client:               client,
-		TransparentParameter: viper.GetStringSlice("http.transparent_parameter"), // 透传参数，直接从配置文件中读取，避免每次都传入
+		TransparentParameter: Cfg.TransparentParameter,
 	}
 }

@@ -32,7 +32,9 @@ type Order struct {
 // ExampleMysqlUsage MySQL 使用示例
 func ExampleMysqlUsage() {
 	// 1. 初始化 MySQL 配置
-	mysqlConfig := map[string]*Config{
+	// 在真实应用中，这些配置通常来自配置文件，并通过config.Init()加载到Cfgs中
+	// 这里为了演示，我们手动设置
+	Cfgs = map[string]*Config{
 		"default": {
 			Dsn:                       []string{"root:password@tcp(localhost:3306)/testdb?charset=utf8mb4&parseTime=True&loc=Local"},
 			MaxConn:                   100,
@@ -58,9 +60,11 @@ func ExampleMysqlUsage() {
 	}
 
 	// 2. 初始化 MySQL 连接
-	if err := InitMysql(mysqlConfig); err != nil {
+	if err := InitMysql(); err != nil {
 		log.Fatalf("Failed to initialize MySQL: %v", err)
 	}
+	// 在示例结束时，确保关闭连接
+	defer CloseMysql()
 
 	// 3. 获取数据库连接
 	db, err := GetConn("default")

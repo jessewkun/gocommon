@@ -1,6 +1,7 @@
 package redis
 
-// Config redis config
+import "github.com/jessewkun/gocommon/config"
+
 type Config struct {
 	Addrs              []string `toml:"addrs" mapstructure:"addrs"`                               // redis addrs ip:port
 	Password           string   `toml:"password" mapstructure:"password"`                         // redis password
@@ -13,6 +14,12 @@ type Config struct {
 	MaxRetries         int      `toml:"max_retries" mapstructure:"max_retries"`                   // 最大重试次数
 	DialTimeout        int      `toml:"dial_timeout" mapstructure:"dial_timeout"`                 // 连接超时时间，单位秒
 	SlowThreshold      int      `toml:"slow_threshold" mapstructure:"slow_threshold"`             // 慢查询阈值，单位毫秒
+}
+
+var Cfgs = make(map[string]*Config)
+
+func init() {
+	config.Register("redis", &Cfgs)
 }
 
 // HealthStatus Redis健康状态

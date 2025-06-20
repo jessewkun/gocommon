@@ -18,7 +18,6 @@ import (
 
 var (
 	logzap   *zap.Logger
-	logcfg   Config
 	hostname string
 	localIP  string
 	once     sync.Once
@@ -66,13 +65,12 @@ func Zap() *zap.Logger {
 	return logzap
 }
 
-func InitLogger(cfg *Config) error {
-	if err := cfg.Validate(); err != nil {
+func InitLogger() error {
+	if err := Cfg.Validate(); err != nil {
 		return fmt.Errorf("invalid logger config: %v", err)
 	}
 
 	initSystemInfo()
-	logcfg = *cfg
 	logzap = zap.New(initCore(), zap.AddCallerSkip(1), zap.AddCaller())
 	return nil
 }
@@ -80,12 +78,12 @@ func InitLogger(cfg *Config) error {
 func initCore() zapcore.Core {
 	opts := []zapcore.WriteSyncer{
 		zapcore.AddSync(&lumberjack.Logger{
-			Filename:   logcfg.Path,      // ⽇志⽂件路径
-			MaxSize:    logcfg.MaxSize,   // 单位为MB,默认为100MB
-			MaxAge:     logcfg.MaxAge,    // 文件最多保存多少天
-			LocalTime:  true,             // 采用本地时间
-			Compress:   false,            // 是否压缩日志
-			MaxBackups: logcfg.MaxBackup, // 保留旧文件的最大个数
+			Filename:   Cfg.Path,      // ⽇志⽂件路径
+			MaxSize:    Cfg.MaxSize,   // 单位为MB,默认为100MB
+			MaxAge:     Cfg.MaxAge,    // 文件最多保存多少天
+			LocalTime:  true,          // 采用本地时间
+			Compress:   false,         // 是否压缩日志
+			MaxBackups: Cfg.MaxBackup, // 保留旧文件的最大个数
 		}),
 	}
 
@@ -122,8 +120,8 @@ func formatField(c context.Context, tag string) []zapcore.Field {
 	// 日志强制添加 trace_id 和 user_id
 	fields = append(fields, FieldsFromCtx(c)...)
 
-	if len(logcfg.TransparentParameter) > 0 {
-		for _, v := range logcfg.TransparentParameter {
+	if len(Cfg.TransparentParameter) > 0 {
+		for _, v := range Cfg.TransparentParameter {
 			if value := c.Value(v); value != nil {
 				fields = append(fields, zap.Any(v, value))
 			}
@@ -135,7 +133,7 @@ func formatField(c context.Context, tag string) []zapcore.Field {
 
 // log 统一的日志记录函数
 func log(c context.Context, entry LogEntry) {
-	if logcfg.Closed {
+	if Cfg.Closed {
 		return
 	}
 
@@ -266,11 +264,11 @@ func Fatal(c context.Context, tag string, msg string, args ...interface{}) {
 }
 
 func SendAlarm(c context.Context, level string, tag string, msg string) {
-	if logcfg.Closed {
+	if Cfg.Closed {
 		return
 	}
 	canAlarm := false
-	for _, v := range alarmLevelMap[logcfg.AlarmLevel] {
+	for _, v := range alarmLevelMap[Cfg.AlarmLevel] {
 		if v == level {
 			canAlarm = true
 			break

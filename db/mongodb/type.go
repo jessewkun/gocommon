@@ -1,6 +1,7 @@
 package mongodb
 
-// Config MongoDB 配置
+import "github.com/jessewkun/gocommon/config"
+
 type Config struct {
 	Uris                   []string `toml:"uris" mapstructure:"uris"`                                         // MongoDB 连接字符串列表
 	MaxPoolSize            int      `toml:"max_pool_size" mapstructure:"max_pool_size"`                       // 最大连接池大小，默认100
@@ -12,6 +13,12 @@ type Config struct {
 	ReadPreference         string   `toml:"read_preference" mapstructure:"read_preference"`                   // 读取偏好：primary, primaryPreferred, secondary, secondaryPreferred, nearest
 	WriteConcern           string   `toml:"write_concern" mapstructure:"write_concern"`                       // 写入关注：majority, 1, 0
 	IsLog                  bool     `toml:"is_log" mapstructure:"is_log"`                                     // 是否记录日志
+}
+
+var Cfgs = make(map[string]*Config)
+
+func init() {
+	config.Register("mongodb", &Cfgs)
 }
 
 // MongoHealthStatus MongoDB 健康状态

@@ -17,12 +17,12 @@ func HealthCheck() map[string]*HealthStatus {
 	defer cancel()
 
 	// 先获取所有连接信息，避免在Ping时持有锁
-	mongoConnList.mu.RLock()
+	connList.mu.RLock()
 	connections := make(map[string]*mongo.Client)
-	for dbName, client := range mongoConnList.conns {
+	for dbName, client := range connList.conns {
 		connections[dbName] = client
 	}
-	mongoConnList.mu.RUnlock()
+	connList.mu.RUnlock()
 
 	// 执行健康检查
 	resp := make(map[string]*HealthStatus)

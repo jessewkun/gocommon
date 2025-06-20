@@ -14,27 +14,17 @@
 
 ## 配置说明
 
-### MongoConfig 配置结构
+### Config 配置结构
 
 ```go
-type MongoConfig struct {
-    Uris                    []string // MongoDB 连接字符串列表
-    MaxPoolSize             int      // 最大连接池大小，默认100
-    MinPoolSize             int      // 最小连接池大小，默认5
-    MaxConnIdleTime         int      // 连接最大空闲时间，单位秒，默认300秒
-    ConnectTimeout          int      // 连接超时时间，单位秒，默认10秒
-    ServerSelectionTimeout  int      // 服务器选择超时时间，单位秒，默认5秒
-    SocketTimeout           int      // Socket超时时间，单位秒，默认30秒
-    ReadPreference          string   // 读取偏好：primary, primaryPreferred, secondary, secondaryPreferred, nearest
-    WriteConcern            string   // 写入关注：majority, 1, 0
-    IsLog                   bool     // 是否记录日志
-}
+// 实际结构体名为 Config
+// 见 type.go
 ```
 
 ### 配置示例
 
 ```go
-mongoConfig := map[string]*MongoConfig{
+mongodb.Cfgs = map[string]*mongodb.Config{
     "default": {
         Uris:                   []string{"mongodb://localhost:27017"},
         MaxPoolSize:            100,
@@ -69,29 +59,27 @@ mongoConfig := map[string]*MongoConfig{
 ```go
 import "github.com/jessewkun/gocommon/db/mongodb"
 
+// 先设置全局配置
+mongodb.Cfgs = ... // 见上方示例
 // 初始化 MongoDB 连接
-if err := mongodb.InitMongoDB(mongoConfig); err != nil {
+if err := mongodb.InitMongoDB(); err != nil {
     log.Fatalf("Failed to initialize MongoDB: %v", err)
 }
 ```
 
-### 2. 获取客户端和数据库
+### 2. 获取客户端、数据库和集合
 
 ```go
-// 获取客户端
+// 推荐直接获取集合
+collection, err := mongodb.GetMongoCollection("default", "testdb", "users")
+if err != nil {
+    log.Fatalf("Failed to get collection: %v", err)
+}
+
+// 也可分步获取
 client, err := mongodb.GetMongoClient("default")
-if err != nil {
-    log.Fatalf("Failed to get client: %v", err)
-}
-
-// 获取数据库
-database, err := mongodb.GetMongoDatabase("default", "testdb")
-if err != nil {
-    log.Fatalf("Failed to get database: %v", err)
-}
-
-// 获取集合
-collection := database.Collection("users")
+db, err := mongodb.GetMongoDatabase("default", "testdb")
+collection := db.Collection("users")
 ```
 
 ### 3. 基本 CRUD 操作
@@ -105,7 +93,6 @@ user := User{
     Created: time.Now(),
     Updated: time.Now(),
 }
-
 insertResult, err := collection.InsertOne(context.Background(), user)
 if err != nil {
     log.Printf("Failed to insert document: %v", err)
@@ -129,7 +116,6 @@ update := bson.M{
         "updated": time.Now(),
     },
 }
-
 updateResult, err := collection.UpdateOne(
     context.Background(),
     bson.M{"name": "张三"},
@@ -161,7 +147,6 @@ err = mongodb.WithTransaction(client, func(sessCtx mongo.SessionContext) error {
     if err != nil {
         return err
     }
-
     _, err = collection.InsertOne(sessCtx, User{
         Name:    "王五",
         Email:   "wangwu@example.com",
@@ -177,13 +162,14 @@ if err != nil {
 } else {
     fmt.Println("Transaction completed successfully")
 }
+// 注意：单机 MongoDB 不支持事务，需副本集或分片集群
 ```
 
 ### 5. 健康检查
 
 ```go
 // 健康检查
-healthStatus := mongodb.MongoHealthCheck()
+healthStatus := mongodb.HealthCheck()
 for dbName, status := range healthStatus {
     fmt.Printf("MongoDB %s health status: %+v\n", dbName, status)
 }
@@ -253,6 +239,10 @@ if err := mongodb.CloseMongoDB(); err != nil {
 ## 示例代码
 
 完整的使用示例请参考 `example.go` 文件。
+
+## 测试用例
+
+完整的测试用例请参考 `mongodb_test.go` 文件，已兼容单机和副本集环境。
 
 ## 依赖
 

@@ -15,25 +15,25 @@ import (
 
 const TAGNAME = "REDIS"
 
-type redisConnections struct {
+type Connections struct {
 	mu    sync.RWMutex
 	conns map[string]map[string]*redis.Client
 }
 
-var connList = &redisConnections{
+var connList = &Connections{
 	conns: make(map[string]map[string]*redis.Client),
 }
 
-// InitRedis 初始化redis
-func InitRedis(cfg map[string]*Config) error {
+// InitRedis 初始化redis，使用模块内注册的Cfgs
+func InitRedis() error {
 	var initErr error
-	for dbName, conf := range cfg {
+	for dbName, conf := range Cfgs {
 		if err := setDefaultConfig(conf); err != nil {
 			initErr = fmt.Errorf("redis %s setDefaultConfig error: %w", dbName, err)
 			logger.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
 			break
 		}
-		if err := redisConnect(dbName, conf); err != nil {
+		if err := newClient(dbName, conf); err != nil {
 			initErr = fmt.Errorf("connect to redis %s error: %w", dbName, err)
 			logger.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
 			break
@@ -72,8 +72,8 @@ func setDefaultConfig(conf *Config) error {
 	return nil
 }
 
-// redisConnect 连接 redis
-func redisConnect(dbName string, conf *Config) error {
+// newClient 连接 redis
+func newClient(dbName string, conf *Config) error {
 	connList.mu.Lock()
 	defer connList.mu.Unlock()
 

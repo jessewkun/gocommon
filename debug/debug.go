@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/jessewkun/gocommon/logger"
-
-	"github.com/spf13/viper"
 )
 
 const TAGNAME = "DEBUG"
@@ -28,7 +26,7 @@ func InitDebug(flag string) DebugFunc {
 // IsDebug 是否开启debug
 func IsDebug(flag string) bool {
 	enable := false
-	for _, part := range viper.GetStringSlice("debug.module") {
+	for _, part := range Cfg.Module {
 		if part == flag {
 			enable = true
 			break
@@ -40,7 +38,7 @@ func IsDebug(flag string) bool {
 // hookPrint 输出debug信息
 func hookPrint(c context.Context, format string, v ...interface{}) {
 	msg := fmt.Sprintf(format, v...)
-	if viper.GetString("debug.mode") == "log" {
+	if Cfg.Mode == "log" {
 		logger.Debug(c, TAGNAME, msg)
 	} else {
 		fmt.Printf("[DEBUG][%s][%s] %s\n",

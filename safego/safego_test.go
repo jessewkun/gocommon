@@ -14,7 +14,8 @@ func init() {
 	cfg.MaxAge = 1
 	cfg.MaxBackup = 1
 	cfg.AlarmLevel = "warn"
-	_ = logger.InitLogger(cfg)
+	logger.Cfg = cfg
+	_ = logger.InitLogger()
 }
 
 func TestWaitGroupWrapper_Wrap(t *testing.T) {

@@ -16,26 +16,26 @@ import (
 
 const TAGNAME = "MONGODB"
 
-type mongoConnections struct {
+type Connections struct {
 	mu    sync.RWMutex
 	conns map[string]*mongo.Client
 }
 
-var mongoConnList = &mongoConnections{
+var connList = &Connections{
 	conns: make(map[string]*mongo.Client),
 }
 
 // InitMongoDB 初始化 MongoDB 连接
-func InitMongoDB(cfg map[string]*Config) error {
+func InitMongoDB() error {
 	var initErr error
-	for dbName, conf := range cfg {
+	for dbName, conf := range Cfgs {
 		err := setMongoDefaultConfig(conf)
 		if err != nil {
 			initErr = fmt.Errorf("mongodb %s setDefaultConfig error: %w", dbName, err)
 			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
 			break
 		}
-		if err := mongoConnect(dbName, conf); err != nil {
+		if err := newClient(dbName, conf); err != nil {
 			initErr = fmt.Errorf("connect to mongodb %s failed, error: %w", dbName, err)
 			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
 			break
@@ -77,13 +77,13 @@ func setMongoDefaultConfig(conf *Config) error {
 	return nil
 }
 
-// mongoConnect 连接 MongoDB
-func mongoConnect(dbName string, conf *Config) error {
-	mongoConnList.mu.Lock()
-	defer mongoConnList.mu.Unlock()
+// newClient 连接 MongoDB
+func newClient(dbName string, conf *Config) error {
+	connList.mu.Lock()
+	defer connList.mu.Unlock()
 
-	if _, ok := mongoConnList.conns[dbName]; ok {
-		if mongoConnList.conns[dbName] != nil {
+	if _, ok := connList.conns[dbName]; ok {
+		if connList.conns[dbName] != nil {
 			return nil
 		}
 	}
@@ -154,7 +154,7 @@ func mongoConnect(dbName string, conf *Config) error {
 		return fmt.Errorf("failed to ping mongodb: %w", err)
 	}
 
-	mongoConnList.conns[dbName] = client
+	connList.conns[dbName] = client
 	gocommonlog.Info(context.Background(), TAGNAME, "connect to mongodb %s succ", dbName)
 
 	return nil
@@ -162,14 +162,14 @@ func mongoConnect(dbName string, conf *Config) error {
 
 // GetMongoClient 获取 MongoDB 客户端
 func GetMongoClient(dbIns string) (*mongo.Client, error) {
-	mongoConnList.mu.RLock()
-	defer mongoConnList.mu.RUnlock()
+	connList.mu.RLock()
+	defer connList.mu.RUnlock()
 
-	if _, ok := mongoConnList.conns[dbIns]; !ok {
+	if _, ok := connList.conns[dbIns]; !ok {
 		return nil, fmt.Errorf("mongodb client is not found")
 	}
 
-	return mongoConnList.conns[dbIns], nil
+	return connList.conns[dbIns], nil
 }
 
 // GetMongoDatabase 获取 MongoDB 数据库实例
@@ -194,11 +194,11 @@ func GetMongoCollection(dbIns, databaseName, collectionName string) (*mongo.Coll
 
 // CloseMongoDB 关闭 MongoDB 连接
 func CloseMongoDB() error {
-	mongoConnList.mu.Lock()
-	defer mongoConnList.mu.Unlock()
+	connList.mu.Lock()
+	defer connList.mu.Unlock()
 
 	var lastErr error
-	for dbName, client := range mongoConnList.conns {
+	for dbName, client := range connList.conns {
 		if client != nil {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			if err := client.Disconnect(ctx); err != nil {
@@ -212,7 +212,7 @@ func CloseMongoDB() error {
 	}
 
 	// 清空连接列表
-	mongoConnList.conns = make(map[string]*mongo.Client)
+	connList.conns = make(map[string]*mongo.Client)
 
 	return lastErr
 }

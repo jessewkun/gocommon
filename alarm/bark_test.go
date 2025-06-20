@@ -6,7 +6,21 @@ import (
 )
 
 func TestSendBark(t *testing.T) {
-	InitBark(&Config{BarkIds: []string{"jT64URJj8b6Fp9Y3nVKJiP"}})
+	originalCfg := Cfg
+	Cfg = &Config{
+		BarkIds: []string{"jT64URJj8b6Fp9Y3nVKJiP"},
+		Timeout: 5,
+	}
+	if err := InitBark(); err != nil {
+		t.Fatalf("InitBark() failed: %v", err)
+	}
+
+	t.Cleanup(func() {
+		Cfg = originalCfg
+		InitBark()
+	})
+
+	// --- Test Cases ---
 	type args struct {
 		ctx     context.Context
 		title   string
@@ -16,19 +30,20 @@ func TestSendBark(t *testing.T) {
 		name string
 		args args
 	}{
-		// TODO: Add test cases.
 		{
-			name: "test",
+			name: "valid bark message",
 			args: args{
 				ctx:     context.Background(),
-				title:   "线上报警",
-				content: "test",
+				title:   "Go Test Alarm",
+				content: "This is a test message from a unit test.",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			SendBark(tt.args.ctx, tt.args.title, tt.args.content)
+			if err := SendBark(tt.args.ctx, tt.args.title, tt.args.content); err != nil {
+				t.Errorf("SendBark() error = %v, wantErr %v", err, false)
+			}
 		})
 	}
 }

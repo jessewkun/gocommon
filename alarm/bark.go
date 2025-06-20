@@ -17,39 +17,36 @@ const (
 )
 
 var (
-	barkIds []string
-	mu      sync.RWMutex
-	client  *http.Client
+	client *http.Client
+	mu     sync.RWMutex
 )
 
 const MaxRetry = 3
 
-// InitBark 初始化 Bark 报警
-func InitBark(config *Config) error {
-	// 如果 BarkIds 为空，则不初始化
-	if len(config.BarkIds) == 0 {
-		return nil
-	}
-
+func InitBark() error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	barkIds = config.BarkIds
+	if Cfg == nil || len(Cfg.BarkIds) == 0 {
+		client = nil
+		return nil
+	}
+
 	client = &http.Client{
-		Timeout: time.Duration(config.Timeout) * time.Second,
+		Timeout: time.Duration(Cfg.Timeout) * time.Second,
 	}
 
 	return nil
 }
 
-// SendBark 发送 Bark 报警
 func SendBark(ctx context.Context, title, content string) error {
 	mu.RLock()
-	ids := barkIds
+	ids := Cfg.BarkIds
+	c := client
 	mu.RUnlock()
 
-	if len(ids) == 0 {
-		return fmt.Errorf("bark ids not initialized")
+	if c == nil || len(ids) == 0 {
+		return fmt.Errorf("bark is not configured or initialized")
 	}
 
 	for _, id := range ids {
@@ -63,7 +60,6 @@ func SendBark(ctx context.Context, title, content string) error {
 	return nil
 }
 
-// sendWithRetry 带重试的发送
 func sendWithRetry(ctx context.Context, id, title, content string) error {
 	var lastErr error
 	for i := 0; i < MaxRetry; i++ {
@@ -77,7 +73,6 @@ func sendWithRetry(ctx context.Context, id, title, content string) error {
 	return lastErr
 }
 
-// send 发送单个 Bark 消息
 func send(ctx context.Context, id, title, content string) error {
 	url := fmt.Sprintf(barkAPI, id, url.QueryEscape(title), url.QueryEscape(content))
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -85,7 +80,15 @@ func send(ctx context.Context, id, title, content string) error {
 		return fmt.Errorf("create request failed: %v", err)
 	}
 
-	resp, err := client.Do(req)
+	mu.RLock()
+	c := client
+	mu.RUnlock()
+
+	if c == nil {
+		return fmt.Errorf("http client for bark not initialized")
+	}
+
+	resp, err := c.Do(req)
 	if err != nil {
 		return fmt.Errorf("send request failed: %v", err)
 	}

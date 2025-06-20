@@ -36,7 +36,7 @@ type Config struct {
 ### 配置示例
 
 ```go
-redisConfig := map[string]*Config{
+redis.Cfgs = map[string]*redis.Config{
     "default": {
         Addrs:              []string{"localhost:6379"},
         Password:           "",
@@ -73,8 +73,10 @@ redisConfig := map[string]*Config{
 ```go
 import "github.com/jessewkun/gocommon/db/redis"
 
+// 先设置全局配置
+redis.Cfgs = ... // 见上方示例
 // 初始化 Redis 连接
-if err := redis.InitRedis(redisConfig); err != nil {
+if err := redis.InitRedis(); err != nil {
     log.Fatalf("Failed to initialize Redis: %v", err)
 }
 ```
@@ -214,6 +216,7 @@ if err != nil {
 
 ```go
 // 使用事务
+// 注意：Redis 事务为乐观锁，不能保证强一致性，适合简单原子操作。
 txf := func(tx *redis.Tx) error {
     // 获取当前值
     val, err := tx.Get(ctx, "counter").Result()
@@ -287,6 +290,7 @@ for dbName, status := range healthStatus {
 支持 Redis 集群模式，可以配置多个节点：
 
 ```go
+// 注意：集群模式下需配置所有节点地址，且部分命令不支持跨 slot 操作。
 redisConfig := map[string]*Config{
     "cluster": {
         Addrs: []string{
@@ -340,7 +344,11 @@ redisConfig := map[string]*Config{
 
 ## 示例代码
 
-完整的使用示例请参考 `example.go` 文件。
+完整的使用示例请参考 example.go 文件。
+
+## 测试用例
+
+完整的测试用例请参考 redis_test.go 文件。
 
 ## 依赖
 

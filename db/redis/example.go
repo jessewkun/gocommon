@@ -31,7 +31,9 @@ type Order struct {
 // ExampleRedisUsage Redis 使用示例
 func ExampleRedisUsage() {
 	// 1. 初始化 Redis 配置
-	redisConfig := map[string]*Config{
+	// 在真实应用中，这些配置通常来自配置文件，并通过config.Init()加载到Cfgs中
+	// 这里为了演示，我们手动设置
+	Cfgs = map[string]*Config{
 		"default": {
 			Addrs:              []string{"localhost:6379"},
 			Password:           "",
@@ -61,9 +63,11 @@ func ExampleRedisUsage() {
 	}
 
 	// 2. 初始化 Redis 连接
-	if err := InitRedis(redisConfig); err != nil {
+	if err := InitRedis(); err != nil {
 		log.Fatalf("Failed to initialize Redis: %v", err)
 	}
+	// 在示例结束时，确保关闭连接
+	defer CloseRedis()
 
 	// 3. 获取 Redis 连接
 	client, err := GetConn("default")

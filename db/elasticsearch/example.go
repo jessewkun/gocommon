@@ -3,19 +3,46 @@ package elasticsearch
 import (
 	"context"
 	"fmt"
+	"log"
+
+	gocommonlog "github.com/jessewkun/gocommon/logger"
 )
 
 func Example() {
-	cfg := Config{
-		Addresses: []string{"http://localhost:9200"},
-		Username:  "",
-		Password:  "",
+	// 初始化 logger
+	cfg := gocommonlog.DefaultConfig()
+	cfg.Path = "./test.log"
+	cfg.MaxSize = 100
+	cfg.MaxAge = 30
+	cfg.MaxBackup = 10
+	cfg.AlarmLevel = "warn"
+	gocommonlog.Cfg = cfg
+	if err := gocommonlog.InitLogger(); err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
 	}
-	client, err := NewClient(cfg)
-	if err != nil {
+
+	// 设置 ES 配置
+	Cfgs = map[string]*Config{
+		"default": {
+			Addresses: []string{"http://localhost:9200"},
+			Username:  "",
+			Password:  "",
+		},
+	}
+
+	// 初始化 ES 连接
+	if err := InitElasticsearch(); err != nil {
 		fmt.Println("ES连接失败:", err)
 		return
 	}
+
+	// 获取客户端
+	client, err := GetClient("default")
+	if err != nil {
+		fmt.Println("获取客户端失败:", err)
+		return
+	}
+
 	ctx := context.Background()
 
 	// 1. 健康检查
