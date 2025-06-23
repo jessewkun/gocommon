@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	gocommonlog "github.com/jessewkun/gocommon/logger"
+	"github.com/jessewkun/gocommon/logger"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -25,19 +25,19 @@ var connList = &Connections{
 	conns: make(map[string]*mongo.Client),
 }
 
-// InitMongoDB 初始化 MongoDB 连接
-func InitMongoDB() error {
+// Init 初始化 MongoDB 连接
+func Init() error {
 	var initErr error
 	for dbName, conf := range Cfgs {
 		err := setMongoDefaultConfig(conf)
 		if err != nil {
 			initErr = fmt.Errorf("mongodb %s setDefaultConfig error: %w", dbName, err)
-			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			logger.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
 			break
 		}
 		if err := newClient(dbName, conf); err != nil {
 			initErr = fmt.Errorf("connect to mongodb %s failed, error: %w", dbName, err)
-			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			logger.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
 			break
 		}
 	}
@@ -155,13 +155,13 @@ func newClient(dbName string, conf *Config) error {
 	}
 
 	connList.conns[dbName] = client
-	gocommonlog.Info(context.Background(), TAGNAME, "connect to mongodb %s succ", dbName)
+	logger.Info(context.Background(), TAGNAME, "connect to mongodb %s succ", dbName)
 
 	return nil
 }
 
-// GetMongoClient 获取 MongoDB 客户端
-func GetMongoClient(dbIns string) (*mongo.Client, error) {
+// GetConn 获取 MongoDB 客户端
+func GetConn(dbIns string) (*mongo.Client, error) {
 	connList.mu.RLock()
 	defer connList.mu.RUnlock()
 
@@ -172,9 +172,9 @@ func GetMongoClient(dbIns string) (*mongo.Client, error) {
 	return connList.conns[dbIns], nil
 }
 
-// GetMongoDatabase 获取 MongoDB 数据库实例
-func GetMongoDatabase(dbIns, databaseName string) (*mongo.Database, error) {
-	client, err := GetMongoClient(dbIns)
+// GetDatabase 获取 MongoDB 数据库实例
+func GetDatabase(dbIns, databaseName string) (*mongo.Database, error) {
+	client, err := GetConn(dbIns)
 	if err != nil {
 		return nil, err
 	}
@@ -182,9 +182,9 @@ func GetMongoDatabase(dbIns, databaseName string) (*mongo.Database, error) {
 	return client.Database(databaseName), nil
 }
 
-// GetMongoCollection 获取 MongoDB 集合实例
-func GetMongoCollection(dbIns, databaseName, collectionName string) (*mongo.Collection, error) {
-	database, err := GetMongoDatabase(dbIns, databaseName)
+// GetCollection 获取 MongoDB 集合实例
+func GetCollection(dbIns, databaseName, collectionName string) (*mongo.Collection, error) {
+	database, err := GetDatabase(dbIns, databaseName)
 	if err != nil {
 		return nil, err
 	}
@@ -192,8 +192,8 @@ func GetMongoCollection(dbIns, databaseName, collectionName string) (*mongo.Coll
 	return database.Collection(collectionName), nil
 }
 
-// CloseMongoDB 关闭 MongoDB 连接
-func CloseMongoDB() error {
+// Close 关闭 MongoDB 连接
+func Close() error {
 	connList.mu.Lock()
 	defer connList.mu.Unlock()
 
@@ -203,9 +203,9 @@ func CloseMongoDB() error {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			if err := client.Disconnect(ctx); err != nil {
 				lastErr = fmt.Errorf("disconnect mongodb %s failed: %w", dbName, err)
-				gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, lastErr.Error())
+				logger.ErrorWithMsg(context.Background(), TAGNAME, lastErr.Error())
 			} else {
-				gocommonlog.Info(context.Background(), TAGNAME, "disconnect mongodb %s succ", dbName)
+				logger.Info(context.Background(), TAGNAME, "disconnect mongodb %s succ", dbName)
 			}
 			cancel()
 		}

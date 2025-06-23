@@ -19,6 +19,7 @@ var Cfgs = make(map[string]*Config)
 
 func init() {
 	config.Register("mongodb", &Cfgs)
+	config.RegisterCallback("mongodb", Init)
 }
 
 // MongoHealthStatus MongoDB 健康状态

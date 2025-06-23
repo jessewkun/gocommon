@@ -52,12 +52,12 @@ func ExampleMongoDBUsage() {
 	}
 
 	// 2. 初始化 MongoDB 连接
-	if err := InitMongoDB(); err != nil {
+	if err := Init(); err != nil {
 		log.Fatalf("Failed to initialize MongoDB: %v", err)
 	}
 
 	// 3. 获取集合
-	collection, err := GetMongoCollection("default", "testdb", "users")
+	collection, err := GetCollection("default", "testdb", "users")
 	if err != nil {
 		log.Fatalf("Failed to get collection: %v", err)
 	}
@@ -119,7 +119,7 @@ func ExampleMongoDBUsage() {
 	}
 
 	// 8. 使用事务
-	client, err := GetMongoClient("default")
+	client, err := GetConn("default")
 	if err != nil {
 		log.Fatalf("Failed to get client for transaction: %v", err)
 	}
@@ -215,7 +215,7 @@ func ExampleMongoDBUsage() {
 	}
 
 	// 12. 关闭连接
-	if err := CloseMongoDB(); err != nil {
+	if err := Close(); err != nil {
 		log.Printf("Failed to close MongoDB connections: %v", err)
 	} else {
 		fmt.Println("All MongoDB connections closed successfully.")

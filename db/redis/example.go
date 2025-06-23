@@ -63,11 +63,11 @@ func ExampleRedisUsage() {
 	}
 
 	// 2. 初始化 Redis 连接
-	if err := InitRedis(); err != nil {
+	if err := Init(); err != nil {
 		log.Fatalf("Failed to initialize Redis: %v", err)
 	}
 	// 在示例结束时，确保关闭连接
-	defer CloseRedis()
+	defer Close()
 
 	// 3. 获取 Redis 连接
 	client, err := GetConn("default")
@@ -320,6 +320,6 @@ func ExampleRedisUsage() {
 	}
 
 	// 16. 关闭连接
-	// 注意：Redis 模块可能没有 CloseRedis 函数，这里只是示例
+	// 注意：Redis 模块可能没有 Close 函数，这里只是示例
 	fmt.Println("Redis example completed successfully")
 }

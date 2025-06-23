@@ -1,6 +1,8 @@
 package redis
 
-import "github.com/jessewkun/gocommon/config"
+import (
+	"github.com/jessewkun/gocommon/config"
+)
 
 type Config struct {
 	Addrs              []string `toml:"addrs" mapstructure:"addrs"`                               // redis addrs ip:port
@@ -20,6 +22,7 @@ var Cfgs = make(map[string]*Config)
 
 func init() {
 	config.Register("redis", &Cfgs)
+	config.RegisterCallback("redis", Init)
 }
 
 // HealthStatus Redis健康状态

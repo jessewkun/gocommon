@@ -20,6 +20,16 @@ import (
 // logTestMutex is used to ensure that tests modifying the global logger config do not run in parallel.
 var logTestMutex sync.Mutex
 
+func TestMain(m *testing.M) {
+	logger.Cfg.Path = "./test.log"
+	_ = logger.Init()
+	// Run all tests
+	code := m.Run()
+	// Cleanup after all tests
+	os.Remove("./test.log")
+	os.Exit(code)
+}
+
 // 测试数据结构
 type TestUser struct {
 	ID    int    `json:"id"`
@@ -679,19 +689,15 @@ func TestClient_Logging(t *testing.T) {
 
 	// --- Setup ---
 	originalLogCfg := logger.Cfg
-	logger.Cfg = logger.DefaultConfig() // Start with a fresh default config
+	// 使用TestMain中已经初始化的logger，但确保配置正确
 	logger.Cfg.Path = "./test.log"
 	logger.Cfg.Closed = false
-
-	err := logger.InitLogger()
-	require.NoError(t, err)
 
 	// --- Cleanup ---
 	t.Cleanup(func() {
 		logger.Cfg = originalLogCfg
-		// It might be useful to re-init with the original config if other tests depend on it
-		logger.InitLogger()
-		os.Remove("./test.log")
+		// 重新初始化logger以恢复原始配置
+		logger.Init()
 	})
 
 	server := createTestServer(t)

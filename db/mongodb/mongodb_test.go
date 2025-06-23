@@ -11,7 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	gocommonlog "github.com/jessewkun/gocommon/logger"
+	"github.com/jessewkun/gocommon/logger"
 )
 
 const (
@@ -23,19 +23,8 @@ const (
 
 // TestMain sets up the test environment
 func TestMain(m *testing.M) {
-	// Set up logger configuration for tests
-	gocommonlog.Cfg.Path = "./test.log"
-	gocommonlog.Cfg.Closed = false
-	gocommonlog.Cfg.MaxSize = 100
-	gocommonlog.Cfg.MaxAge = 30
-	gocommonlog.Cfg.MaxBackup = 10
-	gocommonlog.Cfg.AlarmLevel = "warn"
-
-	// Initialize logger first
-	if err := gocommonlog.InitLogger(); err != nil {
-		fmt.Printf("Failed to initialize logger: %v\n", err)
-		os.Exit(1)
-	}
+	logger.Cfg.Path = "./test.log"
+	_ = logger.Init()
 
 	// Set up configuration for the test MongoDB instance
 	Cfgs = map[string]*Config{
@@ -54,7 +43,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// Initialize MongoDB
-	if err := InitMongoDB(); err != nil {
+	if err := Init(); err != nil {
 		fmt.Printf("Failed to initialize MongoDB for tests: %v\n", err)
 		// Check if the error indicates a connection problem
 		if _, ok := err.(mongo.ServerError); ok || err.Error() == "server selection error: context deadline exceeded" {
@@ -68,7 +57,7 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 
 	// Teardown: Clean up and close connections
-	err := CloseMongoDB()
+	err := Close()
 	if err != nil {
 		fmt.Printf("Failed to close MongoDB connections after tests: %v", err)
 	}
@@ -81,18 +70,18 @@ func TestMain(m *testing.M) {
 
 // TestGetMongoClient tests the retrieval of a mongo client
 func TestGetMongoClient(t *testing.T) {
-	client, err := GetMongoClient(testDBInstance)
+	client, err := GetConn(testDBInstance)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
 	// Test getting a non-existent client
-	_, err = GetMongoClient("nonexistent")
+	_, err = GetConn("nonexistent")
 	assert.Error(t, err)
 }
 
 // TestGetMongoDatabase tests the retrieval of a mongo database
 func TestGetMongoDatabase(t *testing.T) {
-	db, err := GetMongoDatabase(testDBInstance, testDatabaseName)
+	db, err := GetDatabase(testDBInstance, testDatabaseName)
 	assert.NoError(t, err)
 	assert.NotNil(t, db)
 	assert.Equal(t, testDatabaseName, db.Name())
@@ -100,7 +89,7 @@ func TestGetMongoDatabase(t *testing.T) {
 
 // TestGetMongoCollection tests the retrieval of a mongo collection
 func TestGetMongoCollection(t *testing.T) {
-	coll, err := GetMongoCollection(testDBInstance, testDatabaseName, testCollection)
+	coll, err := GetCollection(testDBInstance, testDatabaseName, testCollection)
 	assert.NoError(t, err)
 	assert.NotNil(t, coll)
 	assert.Equal(t, testCollection, coll.Name())
@@ -115,7 +104,7 @@ type testUser struct {
 
 // TestCRUDOperations tests create, read, update, and delete operations
 func TestCRUDOperations(t *testing.T) {
-	coll, err := GetMongoCollection(testDBInstance, testDatabaseName, testCollection)
+	coll, err := GetCollection(testDBInstance, testDatabaseName, testCollection)
 	assert.NoError(t, err)
 
 	// Clean up the collection before the test
@@ -156,10 +145,10 @@ func TestCRUDOperations(t *testing.T) {
 
 // TestWithTransaction tests the transaction helper function
 func TestWithTransaction(t *testing.T) {
-	client, err := GetMongoClient(testDBInstance)
+	client, err := GetConn(testDBInstance)
 	assert.NoError(t, err)
 
-	coll, err := GetMongoCollection(testDBInstance, testDatabaseName, testCollection)
+	coll, err := GetCollection(testDBInstance, testDatabaseName, testCollection)
 	assert.NoError(t, err)
 
 	// This test requires a MongoDB replica set. We will check for the error
@@ -234,7 +223,7 @@ func TestParallelUsage(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			coll, err := GetMongoCollection(testDBInstance, testDatabaseName, "parallel_test")
+			coll, err := GetCollection(testDBInstance, testDatabaseName, "parallel_test")
 			assert.NoError(t, err)
 			_, err = coll.InsertOne(context.Background(), testUser{Name: "Parallel", Age: i})
 			assert.NoError(t, err)
@@ -244,7 +233,7 @@ func TestParallelUsage(t *testing.T) {
 	wg.Wait()
 
 	// Clean up
-	coll, err := GetMongoCollection(testDBInstance, testDatabaseName, "parallel_test")
+	coll, err := GetCollection(testDBInstance, testDatabaseName, "parallel_test")
 	assert.NoError(t, err)
 	err = coll.Drop(context.Background())
 	assert.NoError(t, err)

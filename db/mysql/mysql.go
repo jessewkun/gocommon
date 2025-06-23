@@ -3,7 +3,6 @@ package mysql
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	gocommonlog "github.com/jessewkun/gocommon/logger"
@@ -14,19 +13,8 @@ import (
 	"gorm.io/plugin/dbresolver"
 )
 
-const TAGNAME = "MYSQL"
-
-type Connections struct {
-	mu    sync.RWMutex
-	conns map[string]*gorm.DB
-}
-
-var connList = &Connections{
-	conns: make(map[string]*gorm.DB),
-}
-
-// InitMysql 初始化数据库
-func InitMysql() error {
+// Init 初始化数据库
+func Init() error {
 	var initErr error
 	for dbName, conf := range Cfgs {
 		err := setDefaultConfig(conf)
@@ -143,7 +131,7 @@ func GetConn(dbIns string) (*gorm.DB, error) {
 }
 
 // CloseMysql 关闭 MySQL 连接
-func CloseMysql() error {
+func Close() error {
 	connList.mu.Lock()
 	defer connList.mu.Unlock()
 

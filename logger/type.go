@@ -20,11 +20,11 @@ type Config struct {
 	AlarmLevel           string   `toml:"alarm_level" mapstructure:"alarm_level"`                     // 报警级别, warn 警告, error 错误
 }
 
-// Cfg is the configuration instance for the logger package.
 var Cfg = DefaultConfig()
 
 func init() {
 	config.Register("log", Cfg)
+	config.RegisterCallback("log", Init)
 }
 
 // Validate 验证配置是否合法
@@ -59,7 +59,6 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// DefaultConfig ...
 func DefaultConfig() *Config {
 	return &Config{
 		Path:                 "",

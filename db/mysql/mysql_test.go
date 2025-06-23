@@ -14,20 +14,20 @@ var mysqlTestMutex sync.Mutex
 
 func TestMain(m *testing.M) {
 	logger.Cfg.Path = "./test.log"
-	_ = logger.InitLogger()
+	_ = logger.Init()
 	code := m.Run()
 	os.Remove("./test.log")
 	os.Exit(code)
 }
 
-func TestInitMysql(t *testing.T) {
+func TestInit(t *testing.T) {
 	mysqlTestMutex.Lock()
 	defer mysqlTestMutex.Unlock()
 
 	originalCfgs := Cfgs
 	t.Cleanup(func() {
 		Cfgs = originalCfgs
-		CloseMysql()
+		Close()
 	})
 
 	testCases := []struct {
@@ -49,7 +49,7 @@ func TestInitMysql(t *testing.T) {
 			},
 			checkError: func(t *testing.T, err error) {
 				if err != nil {
-					t.Logf("InitMysql failed as expected without a running DB: %v", err)
+					t.Logf("Init failed as expected without a running DB: %v", err)
 				}
 			},
 			checkConns: func(t *testing.T, initErr error) {
@@ -59,7 +59,7 @@ func TestInitMysql(t *testing.T) {
 					connList.mu.RUnlock()
 					assert.True(t, ok, "connection for 'test_db' should have been created")
 				} else {
-					t.Log("Skipping connection check as InitMysql failed")
+					t.Log("Skipping connection check as Init failed")
 				}
 			},
 		},
@@ -69,7 +69,7 @@ func TestInitMysql(t *testing.T) {
 				Cfgs = make(map[string]*Config)
 			},
 			checkError: func(t *testing.T, err error) {
-				assert.NoError(t, err, "InitMysql should not error with empty config")
+				assert.NoError(t, err, "Init should not error with empty config")
 			},
 			checkConns: func(t *testing.T, initErr error) {
 				connList.mu.RLock()
@@ -83,7 +83,7 @@ func TestInitMysql(t *testing.T) {
 				Cfgs = map[string]*Config{"bad_db": {}}
 			},
 			checkError: func(t *testing.T, err error) {
-				assert.Error(t, err, "InitMysql should error with bad config")
+				assert.Error(t, err, "Init should error with bad config")
 				assert.Contains(t, err.Error(), "mysql dsn is invalid")
 			},
 			checkConns: func(t *testing.T, initErr error) {
@@ -96,10 +96,10 @@ func TestInitMysql(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			CloseMysql()
+			Close()
 			tc.setupCfgs()
 
-			err := InitMysql()
+			err := Init()
 
 			if tc.checkError != nil {
 				tc.checkError(t, err)
@@ -118,7 +118,7 @@ func TestGetConn_And_Close(t *testing.T) {
 	originalCfgs := Cfgs
 	t.Cleanup(func() {
 		Cfgs = originalCfgs
-		CloseMysql()
+		Close()
 	})
 
 	dsn := os.Getenv("TEST_MYSQL_DSN")
@@ -128,7 +128,7 @@ func TestGetConn_And_Close(t *testing.T) {
 	Cfgs = map[string]*Config{
 		"test_cache": {Dsn: []string{dsn}},
 	}
-	if err := InitMysql(); err != nil {
+	if err := Init(); err != nil {
 		t.Skipf("skipping test; could not connect to mysql: %v", err)
 	}
 
@@ -144,7 +144,7 @@ func TestGetConn_And_Close(t *testing.T) {
 	})
 
 	t.Run("close connections", func(t *testing.T) {
-		err := CloseMysql()
+		err := Close()
 		assert.NoError(t, err)
 		connList.mu.RLock()
 		assert.Empty(t, connList.conns)
@@ -159,7 +159,7 @@ func TestTransaction(t *testing.T) {
 	originalCfgs := Cfgs
 	t.Cleanup(func() {
 		Cfgs = originalCfgs
-		CloseMysql()
+		Close()
 	})
 
 	dsn := os.Getenv("TEST_MYSQL_DSN")
@@ -167,7 +167,7 @@ func TestTransaction(t *testing.T) {
 		dsn = "root:123456@tcp(127.0.0.1:3306)/testdb?charset=utf8mb4&parseTime=True&loc=Local"
 	}
 	Cfgs = map[string]*Config{"tx_db": {Dsn: []string{dsn}}}
-	if err := InitMysql(); err != nil {
+	if err := Init(); err != nil {
 		t.Skipf("skipping transaction test; could not connect to mysql: %v", err)
 	}
 

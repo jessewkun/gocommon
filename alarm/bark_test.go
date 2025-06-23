@@ -11,13 +11,13 @@ func TestSendBark(t *testing.T) {
 		BarkIds: []string{"jT64URJj8b6Fp9Y3nVKJiP"},
 		Timeout: 5,
 	}
-	if err := InitBark(); err != nil {
+	if err := Init(); err != nil {
 		t.Fatalf("InitBark() failed: %v", err)
 	}
 
 	t.Cleanup(func() {
 		Cfg = originalCfg
-		InitBark()
+		Init()
 	})
 
 	// --- Test Cases ---

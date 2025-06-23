@@ -15,7 +15,7 @@ var redisTestMutex sync.Mutex
 // TestMain manages setup for all tests in this package.
 func TestMain(m *testing.M) {
 	logger.Cfg.Path = "./test.log"
-	_ = logger.InitLogger()
+	_ = logger.Init()
 	// Run all tests
 	code := m.Run()
 	// Cleanup after all tests
@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestInitRedis(t *testing.T) {
+func TestInit(t *testing.T) {
 	redisTestMutex.Lock()
 	defer redisTestMutex.Unlock()
 
@@ -31,7 +31,7 @@ func TestInitRedis(t *testing.T) {
 	originalCfgs := Cfgs
 	t.Cleanup(func() {
 		Cfgs = originalCfgs
-		CloseRedis()
+		Close()
 	})
 
 	testCases := []struct {
@@ -64,7 +64,7 @@ func TestInitRedis(t *testing.T) {
 				Cfgs = make(map[string]*Config)
 			},
 			checkError: func(t *testing.T, err error) {
-				assert.NoError(t, err, "InitRedis should not error with empty config")
+				assert.NoError(t, err, "Init should not error with empty config")
 			},
 			checkConns: func(t *testing.T) {
 				connList.mu.RLock()
@@ -80,7 +80,7 @@ func TestInitRedis(t *testing.T) {
 				}
 			},
 			checkError: func(t *testing.T, err error) {
-				assert.Error(t, err, "InitRedis should error with bad config")
+				assert.Error(t, err, "Init should error with bad config")
 				assert.Contains(t, err.Error(), "redis addrs is empty")
 			},
 			checkConns: func(t *testing.T) {
@@ -94,10 +94,10 @@ func TestInitRedis(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Ensure a clean state for each test case.
-			CloseRedis()
+			Close()
 			tc.setupCfgs()
 
-			err := InitRedis()
+			err := Init()
 
 			if tc.checkError != nil {
 				tc.checkError(t, err)
@@ -116,7 +116,7 @@ func TestGetConn_And_Close(t *testing.T) {
 	originalCfgs := Cfgs
 	t.Cleanup(func() {
 		Cfgs = originalCfgs
-		CloseRedis()
+		Close()
 	})
 
 	Cfgs = map[string]*Config{
@@ -125,8 +125,8 @@ func TestGetConn_And_Close(t *testing.T) {
 		},
 	}
 	// This part of the test requires a running Redis server.
-	// We call InitRedis and check for an error to see if we can proceed.
-	if InitRedis() != nil {
+	// We call Init and check for an error to see if we can proceed.
+	if Init() != nil {
 		t.Skip("skipping test; could not connect to redis. please ensure redis is running on localhost:6379")
 	}
 
@@ -146,7 +146,7 @@ func TestGetConn_And_Close(t *testing.T) {
 	})
 
 	t.Run("close connections", func(t *testing.T) {
-		errClose := CloseRedis()
+		errClose := Close()
 		assert.NoError(t, errClose)
 		connList.mu.RLock()
 		assert.Empty(t, connList.conns)

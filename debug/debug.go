@@ -3,16 +3,12 @@ package debug
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/jessewkun/gocommon/logger"
 )
 
 const TAGNAME = "DEBUG"
-
-// 使用 sync.Map 缓存模块状态
-var moduleCache sync.Map
 
 // InitDebug 初始化debug
 func InitDebug(flag string) DebugFunc {

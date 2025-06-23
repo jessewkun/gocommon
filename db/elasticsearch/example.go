@@ -17,7 +17,7 @@ func Example() {
 	cfg.MaxBackup = 10
 	cfg.AlarmLevel = "warn"
 	gocommonlog.Cfg = cfg
-	if err := gocommonlog.InitLogger(); err != nil {
+	if err := gocommonlog.Init(); err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 
@@ -31,13 +31,13 @@ func Example() {
 	}
 
 	// 初始化 ES 连接
-	if err := InitElasticsearch(); err != nil {
+	if err := Init(); err != nil {
 		fmt.Println("ES连接失败:", err)
 		return
 	}
 
 	// 获取客户端
-	client, err := GetClient("default")
+	client, err := GetConn("default")
 	if err != nil {
 		fmt.Println("获取客户端失败:", err)
 		return

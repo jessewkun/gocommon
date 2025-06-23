@@ -19,16 +19,14 @@ func (c *Config) Reload(v *viper.Viper) {
 		fmt.Printf("failed to reload alarm config: %v\n", err)
 		return
 	}
-	if err := InitBark(); err != nil {
-		fmt.Printf("failed to re-initialize bark after config reload: %v\n", err)
-	}
-	fmt.Println("Alarm config reloaded and applied.")
+	fmt.Printf("alarm config reload success, config: %+v\n", c)
 }
 
 var Cfg = DefaultConfig()
 
 func init() {
 	config.Register("alarm", Cfg)
+	config.RegisterCallback("alarm", Init)
 }
 
 // DefaultConfig 返回默认配置

@@ -68,12 +68,12 @@ func TestHookPrint_ModeLog(t *testing.T) {
 	originalLogCfg := logger.Cfg
 	logger.Cfg.Path = "./test.log"
 	logger.Cfg.Closed = false
-	if err := logger.InitLogger(); err != nil {
+	if err := logger.Init(); err != nil {
 		t.Fatalf("logger.InitLogger() failed: %v", err)
 	}
 	t.Cleanup(func() {
 		logger.Cfg = originalLogCfg
-		logger.InitLogger()
+		logger.Init()
 		os.Remove("./test.log")
 	})
 

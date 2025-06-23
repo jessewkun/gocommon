@@ -24,8 +24,8 @@ var connList = &Connections{
 	conns: make(map[string]map[string]*redis.Client),
 }
 
-// InitRedis 初始化redis，使用模块内注册的Cfgs
-func InitRedis() error {
+// Init 初始化redis，使用模块内注册的Cfgs
+func Init() error {
 	var initErr error
 	for dbName, conf := range Cfgs {
 		if err := setDefaultConfig(conf); err != nil {
@@ -131,8 +131,8 @@ func GetConn(dbIns string) (*redis.Client, error) {
 	return conns[randomKey], nil
 }
 
-// CloseRedis 关闭 Redis 连接
-func CloseRedis() error {
+// Close 关闭 Redis 连接
+func Close() error {
 	connList.mu.Lock()
 	defer connList.mu.Unlock()
 

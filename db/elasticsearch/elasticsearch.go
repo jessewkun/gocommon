@@ -20,7 +20,7 @@ var connList = &Connections{
 	conns: make(map[string]*Client),
 }
 
-func InitElasticsearch() error {
+func Init() error {
 	var initErr error
 	for dbName, conf := range Cfgs {
 		if err := newClient(dbName, conf); err != nil {
@@ -32,8 +32,8 @@ func InitElasticsearch() error {
 	return initErr
 }
 
-// GetClient 获取指定名称的 ES 客户端
-func GetClient(dbName string) (*Client, error) {
+// GetConn 获取指定名称的 ES 客户端
+func GetConn(dbName string) (*Client, error) {
 	connList.mu.RLock()
 	defer connList.mu.RUnlock()
 

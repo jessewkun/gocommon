@@ -1,9 +1,11 @@
 package mysql
 
 import (
+	"sync"
 	"time"
 
 	"github.com/jessewkun/gocommon/config"
+	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
@@ -20,8 +22,20 @@ type Config struct {
 
 var Cfgs = make(map[string]*Config)
 
+const TAGNAME = "MYSQL"
+
+type Connections struct {
+	mu    sync.RWMutex
+	conns map[string]*gorm.DB
+}
+
+var connList = &Connections{
+	conns: make(map[string]*gorm.DB),
+}
+
 func init() {
 	config.Register("mysql", &Cfgs)
+	config.RegisterCallback("mysql", Init)
 }
 
 // HealthStatus MySQL健康状态

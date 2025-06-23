@@ -60,11 +60,11 @@ func ExampleMysqlUsage() {
 	}
 
 	// 2. 初始化 MySQL 连接
-	if err := InitMysql(); err != nil {
+	if err := Init(); err != nil {
 		log.Fatalf("Failed to initialize MySQL: %v", err)
 	}
 	// 在示例结束时，确保关闭连接
-	defer CloseMysql()
+	defer Close()
 
 	// 3. 获取数据库连接
 	db, err := GetConn("default")
@@ -249,7 +249,7 @@ func ExampleMysqlUsage() {
 	}
 
 	// 17. 关闭连接
-	if err := CloseMysql(); err != nil {
+	if err := Close(); err != nil {
 		log.Printf("Failed to close MySQL connections: %v", err)
 	} else {
 		fmt.Println("MySQL connections closed successfully")

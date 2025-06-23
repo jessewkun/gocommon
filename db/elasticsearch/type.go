@@ -22,6 +22,7 @@ var Cfgs = make(map[string]*Config)
 
 func init() {
 	config.Register("elasticsearch", &Cfgs)
+	config.RegisterCallback("elasticsearch", Init)
 }
 
 // HealthStatus ES健康状态

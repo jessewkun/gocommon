@@ -65,7 +65,7 @@ func Zap() *zap.Logger {
 	return logzap
 }
 
-func InitLogger() error {
+func Init() error {
 	if err := Cfg.Validate(); err != nil {
 		return fmt.Errorf("invalid logger config: %v", err)
 	}

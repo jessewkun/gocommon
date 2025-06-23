@@ -2,23 +2,18 @@ package elasticsearch
 
 import (
 	"context"
+	"os"
 	"testing"
 
-	gocommonlog "github.com/jessewkun/gocommon/logger"
+	"github.com/jessewkun/gocommon/logger"
 )
 
-func init() {
-	// 初始化 logger
-	cfg := gocommonlog.DefaultConfig()
-	cfg.Path = "./test.log"
-	cfg.MaxSize = 100
-	cfg.MaxAge = 30
-	cfg.MaxBackup = 10
-	cfg.AlarmLevel = "warn"
-	gocommonlog.Cfg = cfg
-	if err := gocommonlog.InitLogger(); err != nil {
-		panic(err)
-	}
+func TestMain(m *testing.M) {
+	logger.Cfg.Path = "./test.log"
+	_ = logger.Init()
+	code := m.Run()
+	os.Remove("./test.log")
+	os.Exit(code)
 }
 
 func TestElasticsearch_BasicFlow(t *testing.T) {
@@ -32,12 +27,12 @@ func TestElasticsearch_BasicFlow(t *testing.T) {
 	}
 
 	// 初始化 ES 连接
-	if err := InitElasticsearch(); err != nil {
+	if err := Init(); err != nil {
 		t.Skipf("ES连接失败，跳过测试: %v", err)
 	}
 
 	// 获取客户端
-	client, err := GetClient("default")
+	client, err := GetConn("default")
 	if err != nil {
 		t.Fatalf("获取客户端失败: %v", err)
 	}

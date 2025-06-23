@@ -2,20 +2,20 @@ package safego
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/jessewkun/gocommon/logger"
 )
 
-func init() {
-	cfg := logger.DefaultConfig()
-	cfg.Path = "./test.log"
-	cfg.MaxSize = 1
-	cfg.MaxAge = 1
-	cfg.MaxBackup = 1
-	cfg.AlarmLevel = "warn"
-	logger.Cfg = cfg
-	_ = logger.InitLogger()
+func TestMain(m *testing.M) {
+	logger.Cfg.Path = "./test.log"
+	_ = logger.Init()
+	// Run all tests
+	code := m.Run()
+	// Cleanup after all tests
+	os.Remove("./test.log")
+	os.Exit(code)
 }
 
 func TestWaitGroupWrapper_Wrap(t *testing.T) {

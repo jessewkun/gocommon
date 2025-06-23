@@ -23,7 +23,7 @@ var (
 
 const MaxRetry = 3
 
-func InitBark() error {
+func Init() error {
 	mu.Lock()
 	defer mu.Unlock()
 
