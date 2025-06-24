@@ -547,24 +547,20 @@ func TestClient_RealAPI(t *testing.T) {
 // 测试透传参数功能
 func TestClient_TransparentParameter(t *testing.T) {
 	// 创建一个服务器来验证透传参数
-	var receivedHeaders map[string]string
+	var receivedHeaders []map[string]string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 记录接收到的透传参数
-		receivedHeaders = make(map[string]string)
-
+		// 收集所有请求的header
+		requestHeaders := make(map[string]string)
 		for key, values := range r.Header {
-			if key == "X-User-ID" || key == "X-Trace-ID" ||
-				key == "X-User-Id" || key == "X-Trace-Id" {
-				if len(values) > 0 {
-					receivedHeaders[key] = values[0]
-				}
+			if len(values) > 0 {
+				requestHeaders[key] = values[0]
 			}
 		}
+		receivedHeaders = append(receivedHeaders, requestHeaders)
 
 		// 返回成功响应
-		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "ok"}`))
+		w.Write([]byte("success"))
 	}))
 	defer server.Close()
 
@@ -595,17 +591,72 @@ func TestClient_TransparentParameter(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 		// 验证透传参数是否被正确发送 - 尝试多种可能的header名称
-		userID := receivedHeaders["X-User-ID"]
+		headers := receivedHeaders[len(receivedHeaders)-1]
+		userID := headers["X-User-ID"]
 		if userID == "" {
-			userID = receivedHeaders["X-User-Id"]
+			userID = headers["X-User-Id"]
 		}
-		traceID := receivedHeaders["X-Trace-ID"]
+		traceID := headers["X-Trace-ID"]
 		if traceID == "" {
-			traceID = receivedHeaders["X-Trace-Id"]
+			traceID = headers["X-Trace-Id"]
 		}
 
 		assert.Equal(t, "12345", userID, "X-User-ID header not found")
 		assert.Equal(t, "trace-67890", traceID, "X-Trace-ID header not found")
+	})
+
+	t.Run("透传参数热更新测试", func(t *testing.T) {
+		// 第一次请求，使用原始配置
+		ctx1 := context.WithValue(context.Background(), "X-User-ID", "11111")
+		ctx1 = context.WithValue(ctx1, "X-Trace-ID", "trace-11111")
+		ctx1 = context.WithValue(ctx1, "X-Custom-ID", "custom-11111")
+
+		req1 := GetRequest{
+			URL: server.URL + "/test/get",
+		}
+
+		resp1, err := client.Get(ctx1, req1)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp1.StatusCode)
+
+		// 模拟配置热更新：添加新的透传参数
+		originalConfig := Cfg.TransparentParameter
+		Cfg.TransparentParameter = []string{"X-User-ID", "X-Trace-ID", "X-Custom-ID"}
+		defer func() {
+			Cfg.TransparentParameter = originalConfig
+		}()
+
+		// 第二次请求，使用更新后的配置
+		ctx2 := context.WithValue(context.Background(), "X-User-ID", "22222")
+		ctx2 = context.WithValue(ctx2, "X-Trace-ID", "trace-22222")
+		ctx2 = context.WithValue(ctx2, "X-Custom-ID", "custom-22222")
+
+		req2 := GetRequest{
+			URL: server.URL + "/test/get",
+		}
+
+		resp2, err := client.Get(ctx2, req2)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, resp2.StatusCode)
+
+		// 验证第二次请求包含了新添加的透传参数
+		headers := receivedHeaders[len(receivedHeaders)-1]
+		userID := headers["X-User-Id"]
+		if userID == "" {
+			userID = headers["X-User-ID"]
+		}
+		traceID := headers["X-Trace-Id"]
+		if traceID == "" {
+			traceID = headers["X-Trace-ID"]
+		}
+		customID := headers["X-Custom-Id"]
+		if customID == "" {
+			customID = headers["X-Custom-ID"]
+		}
+
+		assert.Equal(t, "22222", userID, "X-User-ID header should be updated")
+		assert.Equal(t, "trace-22222", traceID, "X-Trace-ID header should be updated")
+		assert.Equal(t, "custom-22222", customID, "X-Custom-ID header should be updated after hot reload")
 	})
 }
 
@@ -615,7 +666,6 @@ func TestClient_Retry(t *testing.T) {
 	retryCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		retryCount++
-		t.Logf("服务器收到第 %d 次请求", retryCount)
 		if retryCount < 3 {
 			// 前两次返回500错误
 			w.WriteHeader(http.StatusInternalServerError)
@@ -648,7 +698,6 @@ func TestClient_Retry(t *testing.T) {
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 		assert.Equal(t, "success", string(resp.Body))
 		// 验证重试次数，由于启用了5xx重试，应该重试3次
-		t.Logf("启用5xx重试 - 实际重试次数: %d", retryCount)
 		assert.GreaterOrEqual(t, retryCount, 3)
 	})
 
@@ -672,7 +721,6 @@ func TestClient_Retry(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, resp.StatusCode) // 应该返回500错误
 		assert.Equal(t, "server error", string(resp.Body))
 		// 验证重试次数，由于禁用了5xx重试，应该只请求1次
-		t.Logf("禁用5xx重试 - 实际重试次数: %d", retryCount)
 		assert.Equal(t, 1, retryCount)
 	})
 }

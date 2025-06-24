@@ -60,17 +60,16 @@ func NewClient(opt Option) *Client {
 	}
 
 	// 透传参数钩子
-	if len(Cfg.TransparentParameter) > 0 {
-		client.OnBeforeRequest(func(c *resty.Client, r *resty.Request) error {
-			ctx := r.Context()
-			for _, parameter := range Cfg.TransparentParameter {
-				if value := ctx.Value(parameter); value != nil {
-					r.SetHeader(parameter, cast.ToString(value))
-				}
+	client.OnBeforeRequest(func(c *resty.Client, r *resty.Request) error {
+		ctx := r.Context()
+		// 每次都从配置中读取最新的透传参数，支持热更新
+		for _, parameter := range Cfg.TransparentParameter {
+			if value := ctx.Value(parameter); value != nil {
+				r.SetHeader(parameter, cast.ToString(value))
 			}
-			return nil
-		})
-	}
+		}
+		return nil
+	})
 
 	return &Client{
 		Client: client,
