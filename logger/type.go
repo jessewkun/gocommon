@@ -62,7 +62,7 @@ func (c *Config) Validate() error {
 func DefaultConfig() *Config {
 	return &Config{
 		Path:                 "",
-		Closed:               false,
+		Closed:               true,
 		MaxSize:              100,
 		MaxAge:               30,
 		MaxBackup:            10,

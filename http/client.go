@@ -3,11 +3,11 @@ package http
 import (
 	"github.com/go-resty/resty/v2"
 	"github.com/jessewkun/gocommon/logger"
+	"github.com/spf13/cast"
 )
 
 type Client struct {
-	Client               *resty.Client
-	TransparentParameter []string `toml:"transparent_parameter" mapstructure:"transparent_parameter"` // 透传参数，继承上下文中的参数
+	Client *resty.Client
 }
 
 func NewClient(opt Option) *Client {
@@ -41,14 +41,14 @@ func NewClient(opt Option) *Client {
 
 	// 日志逻辑现在尊重模块的配置，可以被 Option 覆盖
 	isLog := Cfg.IsTraceLog
-	if opt.IsLog {
-		isLog = true
+	if opt.IsLog != nil {
+		isLog = *opt.IsLog
 	}
 
 	if isLog {
 		client.OnAfterResponse(func(c *resty.Client, r *resty.Response) error {
 			ctx := r.Request.Context()
-			logger.InfoWithField(ctx, "HTTP", "client request", map[string]interface{}{
+			logger.InfoWithField(ctx, TAGNAME, "client request", map[string]interface{}{
 				"client":    c,
 				"url":       r.Request.URL,
 				"respData":  r,
@@ -59,8 +59,20 @@ func NewClient(opt Option) *Client {
 		})
 	}
 
+	// 透传参数钩子
+	if len(Cfg.TransparentParameter) > 0 {
+		client.OnBeforeRequest(func(c *resty.Client, r *resty.Request) error {
+			ctx := r.Context()
+			for _, parameter := range Cfg.TransparentParameter {
+				if value := ctx.Value(parameter); value != nil {
+					r.SetHeader(parameter, cast.ToString(value))
+				}
+			}
+			return nil
+		})
+	}
+
 	return &Client{
-		Client:               client,
-		TransparentParameter: Cfg.TransparentParameter,
+		Client: client,
 	}
 }

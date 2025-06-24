@@ -20,6 +20,9 @@ import (
 // logTestMutex is used to ensure that tests modifying the global logger config do not run in parallel.
 var logTestMutex sync.Mutex
 
+// 辅助函数：创建bool指针
+func ptr(b bool) *bool { return &b }
+
 func TestMain(m *testing.M) {
 	logger.Cfg.Path = "./test.log"
 	_ = logger.Init()
@@ -168,7 +171,7 @@ func TestNewClient(t *testing.T) {
 				Headers: map[string]string{
 					"User-Agent": "TestClient/1.0",
 				},
-				IsLog: true,
+				IsLog: ptr(true),
 			},
 			expected: true,
 		},
@@ -180,7 +183,7 @@ func TestNewClient(t *testing.T) {
 				RetryWaitTime:      1 * time.Second,
 				RetryMaxWaitTime:   5 * time.Second,
 				RetryWith5xxStatus: false,
-				IsLog:              false,
+				IsLog:              ptr(false),
 			},
 			expected: true,
 		},
@@ -192,7 +195,7 @@ func TestNewClient(t *testing.T) {
 				RetryWaitTime:      1 * time.Second,
 				RetryMaxWaitTime:   5 * time.Second,
 				RetryWith5xxStatus: true,
-				IsLog:              false,
+				IsLog:              ptr(false),
 			},
 			expected: true,
 		},
@@ -253,7 +256,7 @@ func TestClient_Get(t *testing.T) {
 
 	client := NewClient(Option{
 		Timeout: 10 * time.Second,
-		IsLog:   false,
+		IsLog:   ptr(false),
 	})
 
 	t.Run("成功GET请求", func(t *testing.T) {
@@ -317,7 +320,7 @@ func TestClient_Post(t *testing.T) {
 
 	client := NewClient(Option{
 		Timeout: 10 * time.Second,
-		IsLog:   false,
+		IsLog:   ptr(false),
 	})
 
 	t.Run("成功POST请求", func(t *testing.T) {
@@ -367,7 +370,7 @@ func TestClient_Upload(t *testing.T) {
 
 	client := NewClient(Option{
 		Timeout: 10 * time.Second,
-		IsLog:   false,
+		IsLog:   ptr(false),
 	})
 
 	t.Run("成功上传文件", func(t *testing.T) {
@@ -406,7 +409,7 @@ func TestClient_UploadWithFilePath(t *testing.T) {
 
 	client := NewClient(Option{
 		Timeout: 10 * time.Second,
-		IsLog:   false,
+		IsLog:   ptr(false),
 	})
 
 	t.Run("成功上传文件路径", func(t *testing.T) {
@@ -441,7 +444,7 @@ func TestClient_Download(t *testing.T) {
 
 	client := NewClient(Option{
 		Timeout: 10 * time.Second,
-		IsLog:   false,
+		IsLog:   ptr(false),
 	})
 
 	t.Run("成功下载文件", func(t *testing.T) {
@@ -471,7 +474,7 @@ func TestClient_Download(t *testing.T) {
 func TestClient_RealAPI(t *testing.T) {
 	client := NewClient(Option{
 		Timeout: 30 * time.Second,
-		IsLog:   false,
+		IsLog:   ptr(false),
 	})
 
 	t.Run("请求JSONPlaceholder API", func(t *testing.T) {
@@ -543,16 +546,41 @@ func TestClient_RealAPI(t *testing.T) {
 
 // 测试透传参数功能
 func TestClient_TransparentParameter(t *testing.T) {
-	server := createTestServer(t)
+	// 创建一个服务器来验证透传参数
+	var receivedHeaders map[string]string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 记录接收到的透传参数
+		receivedHeaders = make(map[string]string)
+
+		for key, values := range r.Header {
+			if key == "X-User-ID" || key == "X-Trace-ID" ||
+				key == "X-User-Id" || key == "X-Trace-Id" {
+				if len(values) > 0 {
+					receivedHeaders[key] = values[0]
+				}
+			}
+		}
+
+		// 返回成功响应
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status": "ok"}`))
+	}))
 	defer server.Close()
+
+	// 保存原始配置
+	originalTransparentParameter := Cfg.TransparentParameter
+	defer func() {
+		Cfg.TransparentParameter = originalTransparentParameter
+	}()
+
+	// 设置透传参数配置
+	Cfg.TransparentParameter = []string{"X-User-ID", "X-Trace-ID"}
 
 	client := NewClient(Option{
 		Timeout: 10 * time.Second,
-		IsLog:   false,
+		IsLog:   ptr(false),
 	})
-
-	// 设置透传参数
-	client.TransparentParameter = []string{"X-User-ID", "X-Trace-ID"}
 
 	t.Run("透传参数测试", func(t *testing.T) {
 		ctx := context.WithValue(context.Background(), "X-User-ID", "12345")
@@ -565,6 +593,19 @@ func TestClient_TransparentParameter(t *testing.T) {
 		resp, err := client.Get(ctx, req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+		// 验证透传参数是否被正确发送 - 尝试多种可能的header名称
+		userID := receivedHeaders["X-User-ID"]
+		if userID == "" {
+			userID = receivedHeaders["X-User-Id"]
+		}
+		traceID := receivedHeaders["X-Trace-ID"]
+		if traceID == "" {
+			traceID = receivedHeaders["X-Trace-Id"]
+		}
+
+		assert.Equal(t, "12345", userID, "X-User-ID header not found")
+		assert.Equal(t, "trace-67890", traceID, "X-Trace-ID header not found")
 	})
 }
 
@@ -595,7 +636,7 @@ func TestClient_Retry(t *testing.T) {
 			RetryWaitTime:      100 * time.Millisecond,
 			RetryMaxWaitTime:   1 * time.Second,
 			RetryWith5xxStatus: true, // 启用5xx重试
-			IsLog:              false,
+			IsLog:              ptr(false),
 		})
 
 		req := GetRequest{
@@ -619,7 +660,7 @@ func TestClient_Retry(t *testing.T) {
 			RetryWaitTime:      100 * time.Millisecond,
 			RetryMaxWaitTime:   1 * time.Second,
 			RetryWith5xxStatus: false, // 禁用5xx重试
-			IsLog:              false,
+			IsLog:              ptr(false),
 		})
 
 		req := GetRequest{
@@ -640,7 +681,7 @@ func TestClient_Retry(t *testing.T) {
 func TestClient_ErrorHandling(t *testing.T) {
 	client := NewClient(Option{
 		Timeout: 5 * time.Second,
-		IsLog:   false,
+		IsLog:   ptr(false),
 	})
 
 	t.Run("无效URL测试", func(t *testing.T) {
@@ -705,7 +746,7 @@ func TestClient_Logging(t *testing.T) {
 
 	client := NewClient(Option{
 		Timeout: 10 * time.Second,
-		IsLog:   true, // 确保日志被激活
+		IsLog:   ptr(true), // 确保日志被激活
 	})
 
 	t.Run("GET请求日志记录", func(t *testing.T) {
@@ -735,7 +776,7 @@ func BenchmarkClient_Get(b *testing.B) {
 
 	client := NewClient(Option{
 		Timeout: 10 * time.Second,
-		IsLog:   false,
+		IsLog:   ptr(false),
 	})
 
 	b.ResetTimer()
@@ -756,7 +797,7 @@ func BenchmarkClient_Post(b *testing.B) {
 
 	client := NewClient(Option{
 		Timeout: 10 * time.Second,
-		IsLog:   false,
+		IsLog:   ptr(false),
 	})
 
 	testData := map[string]string{

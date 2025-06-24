@@ -99,22 +99,22 @@ func callModuleCallback() error {
 	// 备注：模块的注册是依赖的 init 函数，不能依赖模块的注册顺序来初始化模块，会有意想不到的错误
 	if fn, ok := callbacks["alarm"]; ok {
 		if err := fn(); err != nil {
-			return fmt.Errorf("config: failed to call callback for key 'alarm': %v\n", err)
+			return err
 		}
 		delete(callbacks, "alarm")
 	}
 
 	if fn, ok := callbacks["log"]; ok {
 		if err := fn(); err != nil {
-			return fmt.Errorf("config: failed to call callback for key 'log': %v\n", err)
+			return err
 		}
 		delete(callbacks, "log")
 	}
 
 	// 注意如果有前后依赖关系的模块，需要确保先初始化依赖的模块
-	for key, fn := range callbacks {
+	for _, fn := range callbacks {
 		if err := fn(); err != nil {
-			return fmt.Errorf("config: failed to call callback for key '%s': %v\n", key, err)
+			return err
 		}
 	}
 

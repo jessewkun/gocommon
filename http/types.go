@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+const TAGNAME = "HTTP"
+
 type Config struct {
 	TransparentParameter []string `mapstructure:"transparent_parameter"`
 	IsTraceLog           bool     `mapstructure:"is_trace_log"`
@@ -35,12 +37,16 @@ type Option struct {
 	RetryWaitTime      time.Duration     // 重试等待时间
 	RetryMaxWaitTime   time.Duration     // 最大重试等待时间
 	RetryWith5xxStatus bool              // 是否对5xx状态码进行重试
-	IsLog              bool              // 是否记录日志
+	IsLog              *bool             // 是否记录日志，nil表示不覆盖
 }
 
 func (o *Option) String() string {
-	return fmt.Sprintf("Headers: %v, Timeout: %s, RetryCount: %d, RetryWaitTime: %s, RetryMaxWaitTime: %s, RetryWith5xxStatus: %v, IsLog: %v",
-		o.Headers, o.Timeout, o.Retry, o.RetryWaitTime, o.RetryMaxWaitTime, o.RetryWith5xxStatus, o.IsLog)
+	isLogStr := "nil"
+	if o.IsLog != nil {
+		isLogStr = fmt.Sprintf("%v", *o.IsLog)
+	}
+	return fmt.Sprintf("Headers: %v, Timeout: %s, RetryCount: %d, RetryWaitTime: %s, RetryMaxWaitTime: %s, RetryWith5xxStatus: %v, IsLog: %s",
+		o.Headers, o.Timeout, o.Retry, o.RetryWaitTime, o.RetryMaxWaitTime, o.RetryWith5xxStatus, isLogStr)
 }
 
 // Response

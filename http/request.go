@@ -19,22 +19,8 @@ func BuildQuery(data map[string]interface{}) string {
 	return q.Encode()
 }
 
-// setTransparentParameter set transparent parameter
-func (hc *Client) setTransparentParameter(c context.Context) *Client {
-	if len(hc.TransparentParameter) > 0 {
-		for _, parameter := range hc.TransparentParameter {
-			if value := c.Value(parameter); value != nil {
-				hc.Client.SetHeader(parameter, cast.ToString(value))
-			}
-		}
-	}
-	return hc
-}
-
 // Get
-func (hc *Client) Get(ctx context.Context, req GetRequest) (*Response, error) {
-	hc.setTransparentParameter(ctx)
-
+func (c *Client) Get(ctx context.Context, req GetRequest) (*Response, error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -42,8 +28,7 @@ func (hc *Client) Get(ctx context.Context, req GetRequest) (*Response, error) {
 		defer cancel()
 	}
 
-	request := hc.Client.R().
-		SetContext(ctx)
+	request := c.Client.R().SetContext(ctx)
 
 	// 设置请求头
 	if req.Headers != nil {
@@ -51,7 +36,6 @@ func (hc *Client) Get(ctx context.Context, req GetRequest) (*Response, error) {
 	}
 
 	resp, err := request.Get(req.URL)
-
 	if err != nil {
 		return nil, err
 	}
@@ -65,9 +49,7 @@ func (hc *Client) Get(ctx context.Context, req GetRequest) (*Response, error) {
 }
 
 // Post
-func (hc *Client) Post(ctx context.Context, req PostRequest) (*Response, error) {
-	hc.setTransparentParameter(ctx)
-
+func (c *Client) Post(ctx context.Context, req PostRequest) (*Response, error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -75,9 +57,7 @@ func (hc *Client) Post(ctx context.Context, req PostRequest) (*Response, error) 
 		defer cancel()
 	}
 
-	request := hc.Client.R().
-		SetContext(ctx).
-		SetBody(req.Payload)
+	request := c.Client.R().SetContext(ctx).SetBody(req.Payload)
 
 	// 设置请求头
 	if req.Headers != nil {
@@ -85,7 +65,6 @@ func (hc *Client) Post(ctx context.Context, req PostRequest) (*Response, error) 
 	}
 
 	resp, err := request.Post(req.URL)
-
 	if err != nil {
 		return nil, err
 	}
@@ -99,9 +78,7 @@ func (hc *Client) Post(ctx context.Context, req PostRequest) (*Response, error) 
 }
 
 // Upload
-func (hc *Client) Upload(ctx context.Context, req UploadRequest) (respData *Response, err error) {
-	hc.setTransparentParameter(ctx)
-
+func (c *Client) Upload(ctx context.Context, req UploadRequest) (respData *Response, err error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -109,8 +86,7 @@ func (hc *Client) Upload(ctx context.Context, req UploadRequest) (respData *Resp
 		defer cancel()
 	}
 
-	request := hc.Client.R().
-		SetContext(ctx).
+	request := c.Client.R().SetContext(ctx).
 		SetFileReader(req.Param, req.FileName, bytes.NewReader(req.FileBytes)).
 		SetFormData(req.Data)
 
@@ -133,9 +109,7 @@ func (hc *Client) Upload(ctx context.Context, req UploadRequest) (respData *Resp
 }
 
 // UploadWithFilePath
-func (hc *Client) UploadWithFilePath(ctx context.Context, req UploadWithFilePathRequest) (respData *Response, err error) {
-	hc.setTransparentParameter(ctx)
-
+func (c *Client) UploadWithFilePath(ctx context.Context, req UploadWithFilePathRequest) (respData *Response, err error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -143,8 +117,7 @@ func (hc *Client) UploadWithFilePath(ctx context.Context, req UploadWithFilePath
 		defer cancel()
 	}
 
-	request := hc.Client.R().
-		SetContext(ctx).
+	request := c.Client.R().SetContext(ctx).
 		SetFile(req.Param, req.FilePath).
 		SetFormData(req.Data)
 
@@ -167,9 +140,7 @@ func (hc *Client) UploadWithFilePath(ctx context.Context, req UploadWithFilePath
 }
 
 // Download
-func (hc *Client) Download(ctx context.Context, req DownloadRequest) (respData *Response, err error) {
-	hc.setTransparentParameter(ctx)
-
+func (c *Client) Download(ctx context.Context, req DownloadRequest) (respData *Response, err error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -177,9 +148,7 @@ func (hc *Client) Download(ctx context.Context, req DownloadRequest) (respData *
 		defer cancel()
 	}
 
-	request := hc.Client.R().
-		SetContext(ctx).
-		SetOutput(req.FilePath)
+	request := c.Client.R().SetContext(ctx).SetOutput(req.FilePath)
 
 	// 设置请求头
 	if req.Headers != nil {
