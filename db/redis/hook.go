@@ -46,9 +46,9 @@ func (h *RedisHook) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 
 	// 记录慢查询
 	if duration > h.slowThreshold {
-		logger.WarnWithField(ctx, TAGNAME, "REDIS_SLOW_QUERY", fields)
+		logger.WarnWithField(ctx, TAG, "REDIS_SLOW_QUERY", fields)
 	} else {
-		logger.InfoWithField(ctx, TAGNAME, "REDIS_QUERY", fields)
+		logger.InfoWithField(ctx, TAG, "REDIS_QUERY", fields)
 	}
 
 	return nil
@@ -88,9 +88,9 @@ func (h *RedisHook) AfterProcessPipeline(ctx context.Context, cmds []redis.Cmder
 
 	// 记录慢查询
 	if duration > h.slowThreshold {
-		logger.WarnWithField(ctx, TAGNAME, "REDIS_SLOW_PIPELINE", fields)
+		logger.WarnWithField(ctx, TAG, "REDIS_SLOW_PIPELINE", fields)
 	} else {
-		logger.InfoWithField(ctx, TAGNAME, "REDIS_PIPELINE", fields)
+		logger.InfoWithField(ctx, TAG, "REDIS_PIPELINE", fields)
 	}
 
 	return nil

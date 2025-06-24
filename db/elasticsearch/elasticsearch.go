@@ -9,7 +9,7 @@ import (
 	gocommonlog "github.com/jessewkun/gocommon/logger"
 )
 
-const TAGNAME = "ELASTICSEARCH"
+const TAG = "ELASTICSEARCH"
 
 type Connections struct {
 	mu    sync.RWMutex
@@ -25,7 +25,7 @@ func Init() error {
 	for dbName, conf := range Cfgs {
 		if err := newClient(dbName, conf); err != nil {
 			initErr = fmt.Errorf("connect to elasticsearch %s faild, error: %w", dbName, err)
-			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			gocommonlog.ErrorWithMsg(context.Background(), TAG, initErr.Error())
 			break
 		}
 	}
@@ -66,7 +66,7 @@ func newClient(dbName string, cfg *Config) error {
 	}
 
 	connList.conns[dbName] = &Client{ES: es}
-	gocommonlog.Info(context.Background(), TAGNAME, "connect to elasticsearch %s succ", dbName)
+	gocommonlog.Info(context.Background(), TAG, "connect to elasticsearch %s succ", dbName)
 
 	return nil
 }

@@ -13,7 +13,7 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-const TAGNAME = "REDIS"
+const TAG = "REDIS"
 
 type Connections struct {
 	mu    sync.RWMutex
@@ -30,12 +30,12 @@ func Init() error {
 	for dbName, conf := range Cfgs {
 		if err := setDefaultConfig(conf); err != nil {
 			initErr = fmt.Errorf("redis %s setDefaultConfig error: %w", dbName, err)
-			logger.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
 			break
 		}
 		if err := newClient(dbName, conf); err != nil {
 			initErr = fmt.Errorf("connect to redis %s error: %w", dbName, err)
-			logger.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
 			break
 		}
 	}
@@ -100,7 +100,7 @@ func newClient(dbName string, conf *Config) error {
 			client.AddHook(newRedisHook(time.Duration(conf.SlowThreshold) * time.Millisecond))
 		}
 		connList.conns[dbName][addr] = client
-		logger.Info(context.Background(), TAGNAME, "connect to redis %s addr %s succ", dbName, addr)
+		logger.Info(context.Background(), TAG, "connect to redis %s addr %s succ", dbName, addr)
 	}
 	return nil
 }
@@ -142,9 +142,9 @@ func Close() error {
 			if conn != nil {
 				if err := conn.Close(); err != nil {
 					lastErr = fmt.Errorf("close redis %s addr %s failed: %w", dbName, addr, err)
-					logger.ErrorWithMsg(context.Background(), TAGNAME, lastErr.Error())
+					logger.ErrorWithMsg(context.Background(), TAG, lastErr.Error())
 				} else {
-					logger.Info(context.Background(), TAGNAME, "close redis %s addr %s succ", dbName, addr)
+					logger.Info(context.Background(), TAG, "close redis %s addr %s succ", dbName, addr)
 				}
 			}
 		}

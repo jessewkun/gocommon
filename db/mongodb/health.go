@@ -34,7 +34,7 @@ func HealthCheck() map[string]*HealthStatus {
 		if client == nil {
 			status.Status = "error"
 			status.Error = "client is nil"
-			logger.ErrorWithMsg(ctx, TAGNAME, "mongodb %s client is nil", dbName)
+			logger.ErrorWithMsg(ctx, TAG, "mongodb %s client is nil", dbName)
 			resp[dbName] = status
 			continue
 		}
@@ -55,7 +55,7 @@ func HealthCheck() map[string]*HealthStatus {
 			default:
 				status.Error = err.Error()
 			}
-			logger.ErrorWithMsg(ctx, TAGNAME, "ping mongodb %s failed, error: %s", dbName, err)
+			logger.ErrorWithMsg(ctx, TAG, "ping mongodb %s failed, error: %s", dbName, err)
 		} else {
 			status.Status = "success"
 		}

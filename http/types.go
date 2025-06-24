@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const TAGNAME = "HTTP"
+const TAG = "HTTP"
 
 type Config struct {
 	TransparentParameter []string `mapstructure:"transparent_parameter"`

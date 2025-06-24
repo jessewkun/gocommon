@@ -1,3 +1,3 @@
 package middleware
 
-var TAGNAME = "MIDDLEWARE"
+var TAG = "MIDDLEWARE"

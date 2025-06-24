@@ -36,7 +36,7 @@ func HealthCheck() map[string]*HealthStatus {
 		if err != nil {
 			status.Status = "error"
 			status.Error = fmt.Sprintf("get db instance error: %v", err)
-			logger.ErrorWithMsg(ctx, TAGNAME, "get mysql %s db failed, error: %s", dbName, err)
+			logger.ErrorWithMsg(ctx, TAG, "get mysql %s db failed, error: %s", dbName, err)
 			resp[dbName] = status
 			continue
 		}
@@ -62,7 +62,7 @@ func HealthCheck() map[string]*HealthStatus {
 			default:
 				status.Error = err.Error()
 			}
-			logger.ErrorWithMsg(ctx, TAGNAME, "ping mysql %s failed, error: %s", dbName, err)
+			logger.ErrorWithMsg(ctx, TAG, "ping mysql %s failed, error: %s", dbName, err)
 		} else {
 			status.Status = "success"
 		}

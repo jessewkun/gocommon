@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	TAGNAME = "ALARM"
+	TAG     = "ALARM"
 	barkAPI = "https://api.day.app/%s/%s/%s"
 )
 

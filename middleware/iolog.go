@@ -140,7 +140,7 @@ func IOLog(config *IOLogConfig) gin.HandlerFunc {
 		}
 
 		// 记录日志
-		logFunc(c.Request.Context(), TAGNAME, "IOLOG", fields)
+		logFunc(c.Request.Context(), TAG, "IOLOG", fields)
 	}
 }
 

@@ -122,7 +122,7 @@ func JwtAuth(config *JWTConfig) gin.HandlerFunc {
 			newToken, err := refreshToken(claims)
 			if err != nil {
 				if jwtConfig.EnableLog {
-					logger.Error(c.Request.Context(), TAGNAME, err)
+					logger.Error(c.Request.Context(), TAG, err)
 				}
 			} else {
 				c.Header("X-New-Token", newToken)
@@ -184,7 +184,7 @@ func cleanupBlacklist() {
 // handleError 处理错误
 func handleError(c *gin.Context, errMsg string) {
 	if jwtConfig.EnableLog {
-		logger.Warn(c.Request.Context(), TAGNAME, "JWT error: %s", errMsg)
+		logger.Warn(c.Request.Context(), TAG, "JWT error: %s", errMsg)
 	}
 
 	if jwtConfig.ErrorHandler != nil {

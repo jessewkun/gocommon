@@ -73,7 +73,7 @@ func RateLimiter(cfg *RateLimiterConfig) gin.HandlerFunc {
 		// 检查全局限流
 		if !config.GlobalLimiter.Allow() {
 			if config.EnableLog {
-				logger.Warn(c.Request.Context(), TAGNAME, "Global rate limit exceeded")
+				logger.Warn(c.Request.Context(), TAG, "Global rate limit exceeded")
 			}
 			c.JSON(http.StatusOK, response.RateLimiterErrorResp(c))
 			c.Abort()
@@ -86,7 +86,7 @@ func RateLimiter(cfg *RateLimiterConfig) gin.HandlerFunc {
 			limiter := getIPLimiter(ip)
 			if !limiter.Allow() {
 				if config.EnableLog {
-					logger.Warn(c.Request.Context(), TAGNAME, "IP rate limit exceeded: %s", ip)
+					logger.Warn(c.Request.Context(), TAG, "IP rate limit exceeded: %s", ip)
 				}
 				c.JSON(http.StatusOK, response.RateLimiterErrorResp(c))
 				c.Abort()
@@ -130,6 +130,6 @@ func cleanupIPLimiters() {
 	// 这里可以添加清理逻辑，比如删除长时间未使用的 IP 限流器
 	// 为了简单起见，这里只是打印一下当前 IP 限流器的数量
 	if config.EnableLog {
-		logger.Info(nil, TAGNAME, "Current IP limiters count: %d", len(config.IPLimiters))
+		logger.Info(nil, TAG, "Current IP limiters count: %d", len(config.IPLimiters))
 	}
 }

@@ -14,7 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
-const TAGNAME = "MONGODB"
+const TAG = "MONGODB"
 
 type Connections struct {
 	mu    sync.RWMutex
@@ -32,12 +32,12 @@ func Init() error {
 		err := setMongoDefaultConfig(conf)
 		if err != nil {
 			initErr = fmt.Errorf("mongodb %s setDefaultConfig error: %w", dbName, err)
-			logger.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
 			break
 		}
 		if err := newClient(dbName, conf); err != nil {
 			initErr = fmt.Errorf("connect to mongodb %s failed, error: %w", dbName, err)
-			logger.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
 			break
 		}
 	}
@@ -155,7 +155,7 @@ func newClient(dbName string, conf *Config) error {
 	}
 
 	connList.conns[dbName] = client
-	logger.Info(context.Background(), TAGNAME, "connect to mongodb %s succ", dbName)
+	logger.Info(context.Background(), TAG, "connect to mongodb %s succ", dbName)
 
 	return nil
 }
@@ -203,9 +203,9 @@ func Close() error {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			if err := client.Disconnect(ctx); err != nil {
 				lastErr = fmt.Errorf("disconnect mongodb %s failed: %w", dbName, err)
-				logger.ErrorWithMsg(context.Background(), TAGNAME, lastErr.Error())
+				logger.ErrorWithMsg(context.Background(), TAG, lastErr.Error())
 			} else {
-				logger.Info(context.Background(), TAGNAME, "disconnect mongodb %s succ", dbName)
+				logger.Info(context.Background(), TAG, "disconnect mongodb %s succ", dbName)
 			}
 			cancel()
 		}

@@ -8,7 +8,7 @@ import (
 	"github.com/jessewkun/gocommon/logger"
 )
 
-const TAGNAME = "DEBUG"
+const TAG = "DEBUG"
 
 // InitDebug 初始化debug
 func InitDebug(flag string) DebugFunc {
@@ -35,11 +35,11 @@ func IsDebug(flag string) bool {
 func hookPrint(c context.Context, format string, v ...interface{}) {
 	msg := fmt.Sprintf(format, v...)
 	if Cfg.Mode == "log" {
-		logger.Debug(c, TAGNAME, msg)
+		logger.Debug(c, TAG, msg)
 	} else {
 		fmt.Printf("[DEBUG][%s][%s] %s\n",
 			time.Now().Format("2006-01-02 15:04:05"),
-			TAGNAME,
+			TAG,
 			msg)
 	}
 }

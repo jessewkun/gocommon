@@ -20,12 +20,12 @@ func Init() error {
 		err := setDefaultConfig(conf)
 		if err != nil {
 			initErr = fmt.Errorf("mysql %s setDefaultConfig error: %w", dbName, err)
-			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			gocommonlog.ErrorWithMsg(context.Background(), TAG, initErr.Error())
 			break
 		}
 		if err := newClient(dbName, conf); err != nil {
 			initErr = fmt.Errorf("connect to mysql %s faild, error: %w", dbName, err)
-			gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, initErr.Error())
+			gocommonlog.ErrorWithMsg(context.Background(), TAG, initErr.Error())
 			break
 		}
 	}
@@ -113,7 +113,7 @@ func newClient(dbName string, conf *Config) error {
 	)
 
 	connList.conns[dbName] = dbOne
-	gocommonlog.Info(context.Background(), TAGNAME, "connect to mysql %s succ", dbName)
+	gocommonlog.Info(context.Background(), TAG, "connect to mysql %s succ", dbName)
 
 	return nil
 }
@@ -141,15 +141,15 @@ func Close() error {
 			sqlDB, err := db.DB()
 			if err != nil {
 				lastErr = fmt.Errorf("get sql.DB for mysql %s failed: %w", dbName, err)
-				gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, lastErr.Error())
+				gocommonlog.ErrorWithMsg(context.Background(), TAG, lastErr.Error())
 				continue
 			}
 
 			if err := sqlDB.Close(); err != nil {
 				lastErr = fmt.Errorf("close mysql %s failed: %w", dbName, err)
-				gocommonlog.ErrorWithMsg(context.Background(), TAGNAME, lastErr.Error())
+				gocommonlog.ErrorWithMsg(context.Background(), TAG, lastErr.Error())
 			} else {
-				gocommonlog.Info(context.Background(), TAGNAME, "close mysql %s succ", dbName)
+				gocommonlog.Info(context.Background(), TAG, "close mysql %s succ", dbName)
 			}
 		}
 	}

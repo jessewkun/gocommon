@@ -50,7 +50,7 @@ func HealthCheck() map[string]map[string]*HealthStatus {
 				default:
 					status.Error = err.Error()
 				}
-				logger.ErrorWithMsg(ctx, TAGNAME, "redis ping db %s addr %s error %s", dbName, addr, err)
+				logger.ErrorWithMsg(ctx, TAG, "redis ping db %s addr %s error %s", dbName, addr, err)
 			} else {
 				status.Status = "success"
 			}

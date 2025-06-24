@@ -22,7 +22,7 @@ type Config struct {
 
 var Cfgs = make(map[string]*Config)
 
-const TAGNAME = "MYSQL"
+const TAG = "MYSQL"
 
 type Connections struct {
 	mu    sync.RWMutex
