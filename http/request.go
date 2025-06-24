@@ -20,7 +20,7 @@ func BuildQuery(data map[string]interface{}) string {
 }
 
 // Get
-func (c *Client) Get(ctx context.Context, req GetRequest) (*Response, error) {
+func (c *Client) Get(ctx context.Context, req RequestGet) (*Response, error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -28,7 +28,7 @@ func (c *Client) Get(ctx context.Context, req GetRequest) (*Response, error) {
 		defer cancel()
 	}
 
-	request := c.Client.R().SetContext(ctx)
+	request := c.client.R().SetContext(ctx)
 
 	// 设置请求头
 	if req.Headers != nil {
@@ -49,7 +49,7 @@ func (c *Client) Get(ctx context.Context, req GetRequest) (*Response, error) {
 }
 
 // Post
-func (c *Client) Post(ctx context.Context, req PostRequest) (*Response, error) {
+func (c *Client) Post(ctx context.Context, req RequestPost) (*Response, error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -57,7 +57,7 @@ func (c *Client) Post(ctx context.Context, req PostRequest) (*Response, error) {
 		defer cancel()
 	}
 
-	request := c.Client.R().SetContext(ctx).SetBody(req.Payload)
+	request := c.client.R().SetContext(ctx).SetBody(req.Payload)
 
 	// 设置请求头
 	if req.Headers != nil {
@@ -78,7 +78,7 @@ func (c *Client) Post(ctx context.Context, req PostRequest) (*Response, error) {
 }
 
 // Upload
-func (c *Client) Upload(ctx context.Context, req UploadRequest) (respData *Response, err error) {
+func (c *Client) Upload(ctx context.Context, req RequestUpload) (respData *Response, err error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -86,7 +86,7 @@ func (c *Client) Upload(ctx context.Context, req UploadRequest) (respData *Respo
 		defer cancel()
 	}
 
-	request := c.Client.R().SetContext(ctx).
+	request := c.client.R().SetContext(ctx).
 		SetFileReader(req.Param, req.FileName, bytes.NewReader(req.FileBytes)).
 		SetFormData(req.Data)
 
@@ -109,7 +109,7 @@ func (c *Client) Upload(ctx context.Context, req UploadRequest) (respData *Respo
 }
 
 // UploadWithFilePath
-func (c *Client) UploadWithFilePath(ctx context.Context, req UploadWithFilePathRequest) (respData *Response, err error) {
+func (c *Client) UploadWithFilePath(ctx context.Context, req RequestUploadWithFilePath) (respData *Response, err error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -117,7 +117,7 @@ func (c *Client) UploadWithFilePath(ctx context.Context, req UploadWithFilePathR
 		defer cancel()
 	}
 
-	request := c.Client.R().SetContext(ctx).
+	request := c.client.R().SetContext(ctx).
 		SetFile(req.Param, req.FilePath).
 		SetFormData(req.Data)
 
@@ -140,7 +140,7 @@ func (c *Client) UploadWithFilePath(ctx context.Context, req UploadWithFilePathR
 }
 
 // Download
-func (c *Client) Download(ctx context.Context, req DownloadRequest) (respData *Response, err error) {
+func (c *Client) Download(ctx context.Context, req RequestDownload) (respData *Response, err error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -148,7 +148,7 @@ func (c *Client) Download(ctx context.Context, req DownloadRequest) (respData *R
 		defer cancel()
 	}
 
-	request := c.Client.R().SetContext(ctx).SetOutput(req.FilePath)
+	request := c.client.R().SetContext(ctx).SetOutput(req.FilePath)
 
 	// 设置请求头
 	if req.Headers != nil {

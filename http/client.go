@@ -7,7 +7,7 @@ import (
 )
 
 type Client struct {
-	Client *resty.Client
+	client *resty.Client
 }
 
 func NewClient(opt Option) *Client {
@@ -72,6 +72,6 @@ func NewClient(opt Option) *Client {
 	})
 
 	return &Client{
-		Client: client,
+		client: client,
 	}
 }

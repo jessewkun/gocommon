@@ -62,7 +62,7 @@ func (h *Response) String() string {
 }
 
 // post request
-type PostRequest struct {
+type RequestPost struct {
 	URL     string            // 请求地址
 	Payload interface{}       // 请求数据
 	Headers map[string]string // 请求头
@@ -70,7 +70,7 @@ type PostRequest struct {
 }
 
 // upload request
-type UploadRequest struct {
+type RequestUpload struct {
 	URL       string            // 请求地址
 	FileBytes []byte            // 文件字节
 	Param     string            // 文件参数名
@@ -81,7 +81,7 @@ type UploadRequest struct {
 }
 
 // upload with file path request
-type UploadWithFilePathRequest struct {
+type RequestUploadWithFilePath struct {
 	URL      string            // 请求地址
 	FileName string            // 文件名
 	FilePath string            // 文件路径
@@ -92,7 +92,7 @@ type UploadWithFilePathRequest struct {
 }
 
 // download request
-type DownloadRequest struct {
+type RequestDownload struct {
 	URL      string            // 请求地址
 	FilePath string            // 文件路径
 	Headers  map[string]string // 请求头
@@ -100,7 +100,7 @@ type DownloadRequest struct {
 }
 
 // get request
-type GetRequest struct {
+type RequestGet struct {
 	URL     string            // 请求地址
 	Headers map[string]string // 请求头
 	Timeout time.Duration     // 请求超时时间，如果为0则使用客户端默认超时时间

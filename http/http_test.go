@@ -205,7 +205,7 @@ func TestNewClient(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := NewClient(tt.option)
 			assert.NotNil(t, client)
-			assert.NotNil(t, client.Client)
+			assert.NotNil(t, client.client)
 		})
 	}
 }
@@ -260,7 +260,7 @@ func TestClient_Get(t *testing.T) {
 	})
 
 	t.Run("成功GET请求", func(t *testing.T) {
-		req := GetRequest{
+		req := RequestGet{
 			URL: server.URL + "/test/get",
 			Headers: map[string]string{
 				"Accept": "application/json",
@@ -281,7 +281,7 @@ func TestClient_Get(t *testing.T) {
 	})
 
 	t.Run("带超时的GET请求", func(t *testing.T) {
-		req := GetRequest{
+		req := RequestGet{
 			URL:     server.URL + "/test/get",
 			Timeout: 5 * time.Second,
 		}
@@ -292,7 +292,7 @@ func TestClient_Get(t *testing.T) {
 	})
 
 	t.Run("超时GET请求", func(t *testing.T) {
-		req := GetRequest{
+		req := RequestGet{
 			URL:     server.URL + "/test/timeout",
 			Timeout: 1 * time.Second,
 		}
@@ -303,7 +303,7 @@ func TestClient_Get(t *testing.T) {
 	})
 
 	t.Run("错误响应GET请求", func(t *testing.T) {
-		req := GetRequest{
+		req := RequestGet{
 			URL: server.URL + "/test/error",
 		}
 
@@ -329,7 +329,7 @@ func TestClient_Post(t *testing.T) {
 			Email: "lisi@example.com",
 		}
 
-		req := PostRequest{
+		req := RequestPost{
 			URL:     server.URL + "/test/post",
 			Payload: user,
 			Headers: map[string]string{
@@ -351,7 +351,7 @@ func TestClient_Post(t *testing.T) {
 	})
 
 	t.Run("带超时的POST请求", func(t *testing.T) {
-		req := PostRequest{
+		req := RequestPost{
 			URL:     server.URL + "/test/post",
 			Payload: map[string]string{"test": "data"},
 			Timeout: 5 * time.Second,
@@ -375,7 +375,7 @@ func TestClient_Upload(t *testing.T) {
 
 	t.Run("成功上传文件", func(t *testing.T) {
 		fileContent := []byte("这是一个测试文件的内容")
-		req := UploadRequest{
+		req := RequestUpload{
 			URL:       server.URL + "/test/upload",
 			FileBytes: fileContent,
 			Param:     "file",
@@ -420,7 +420,7 @@ func TestClient_UploadWithFilePath(t *testing.T) {
 		err := os.WriteFile(tempFile, fileContent, 0644)
 		require.NoError(t, err)
 
-		req := UploadWithFilePathRequest{
+		req := RequestUploadWithFilePath{
 			URL:      server.URL + "/test/upload",
 			FilePath: tempFile,
 			FileName: "test_upload.txt",
@@ -451,7 +451,7 @@ func TestClient_Download(t *testing.T) {
 		tempDir := t.TempDir()
 		downloadPath := filepath.Join(tempDir, "downloaded_test.txt")
 
-		req := DownloadRequest{
+		req := RequestDownload{
 			URL:      server.URL + "/test/download",
 			FilePath: downloadPath,
 			Headers: map[string]string{
@@ -478,7 +478,7 @@ func TestClient_RealAPI(t *testing.T) {
 	})
 
 	t.Run("请求JSONPlaceholder API", func(t *testing.T) {
-		req := GetRequest{
+		req := RequestGet{
 			URL: "https://jsonplaceholder.typicode.com/posts/1",
 			Headers: map[string]string{
 				"Accept": "application/json",
@@ -505,7 +505,7 @@ func TestClient_RealAPI(t *testing.T) {
 			"message": "这是一个测试请求",
 		}
 
-		req := PostRequest{
+		req := RequestPost{
 			URL:     "https://httpbin.org/post",
 			Payload: testData,
 			Headers: map[string]string{
@@ -527,7 +527,7 @@ func TestClient_RealAPI(t *testing.T) {
 	})
 
 	t.Run("请求HTTPBin获取IP", func(t *testing.T) {
-		req := GetRequest{
+		req := RequestGet{
 			URL: "https://httpbin.org/ip",
 		}
 
@@ -582,7 +582,7 @@ func TestClient_TransparentParameter(t *testing.T) {
 		ctx := context.WithValue(context.Background(), "X-User-ID", "12345")
 		ctx = context.WithValue(ctx, "X-Trace-ID", "trace-67890")
 
-		req := GetRequest{
+		req := RequestGet{
 			URL: server.URL + "/test/get",
 		}
 
@@ -611,7 +611,7 @@ func TestClient_TransparentParameter(t *testing.T) {
 		ctx1 = context.WithValue(ctx1, "X-Trace-ID", "trace-11111")
 		ctx1 = context.WithValue(ctx1, "X-Custom-ID", "custom-11111")
 
-		req1 := GetRequest{
+		req1 := RequestGet{
 			URL: server.URL + "/test/get",
 		}
 
@@ -631,7 +631,7 @@ func TestClient_TransparentParameter(t *testing.T) {
 		ctx2 = context.WithValue(ctx2, "X-Trace-ID", "trace-22222")
 		ctx2 = context.WithValue(ctx2, "X-Custom-ID", "custom-22222")
 
-		req2 := GetRequest{
+		req2 := RequestGet{
 			URL: server.URL + "/test/get",
 		}
 
@@ -689,7 +689,7 @@ func TestClient_Retry(t *testing.T) {
 			IsLog:              ptr(false),
 		})
 
-		req := GetRequest{
+		req := RequestGet{
 			URL: server.URL,
 		}
 
@@ -712,7 +712,7 @@ func TestClient_Retry(t *testing.T) {
 			IsLog:              ptr(false),
 		})
 
-		req := GetRequest{
+		req := RequestGet{
 			URL: server.URL,
 		}
 
@@ -733,7 +733,7 @@ func TestClient_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("无效URL测试", func(t *testing.T) {
-		req := GetRequest{
+		req := RequestGet{
 			URL: "http://invalid-domain-that-does-not-exist-12345.com",
 		}
 
@@ -742,7 +742,7 @@ func TestClient_ErrorHandling(t *testing.T) {
 	})
 
 	t.Run("超时测试", func(t *testing.T) {
-		req := GetRequest{
+		req := RequestGet{
 			URL:     "https://httpbin.org/delay/10",
 			Timeout: 1 * time.Second,
 		}
@@ -798,7 +798,7 @@ func TestClient_Logging(t *testing.T) {
 	})
 
 	t.Run("GET请求日志记录", func(t *testing.T) {
-		req := GetRequest{
+		req := RequestGet{
 			URL: server.URL + "/test/get",
 		}
 
@@ -829,7 +829,7 @@ func BenchmarkClient_Get(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req := GetRequest{
+		req := RequestGet{
 			URL: server.URL + "/test/get",
 		}
 		_, err := client.Get(context.Background(), req)
@@ -855,7 +855,7 @@ func BenchmarkClient_Post(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		req := PostRequest{
+		req := RequestPost{
 			URL:     server.URL + "/test/post",
 			Payload: testData,
 		}
