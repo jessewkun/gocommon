@@ -11,6 +11,82 @@
 -   ✅ 支持健康检查
 -   ✅ 支持优雅关闭
 -   ✅ 支持日志记录
+-   ✅ 支持基础模型（BaseModel）
+-   ✅ 支持自定义时间类型（DateTime）
+
+## 数据模型
+
+### BaseModel 基础模型
+
+提供了基础的数据模型结构，包含通用字段：
+
+```go
+type BaseModel struct {
+    ID         uint     `gorm:"primarykey" json:"id"`
+    CreatedAt  DateTime `gorm:"type:datetime" json:"created_at"`
+    ModifiedAt DateTime `gorm:"type:datetime" json:"modified_at"`
+}
+```
+
+**字段说明：**
+
+-   `ID`: 主键字段，自动递增
+-   `CreatedAt`: 创建时间，自动设置
+-   `ModifiedAt`: 修改时间，自动更新
+
+**使用示例：**
+
+```go
+type User struct {
+    BaseModel
+    Name  string `gorm:"type:varchar(100)" json:"name"`
+    Email string `gorm:"type:varchar(100)" json:"email"`
+}
+
+// 创建用户时，CreatedAt 和 ModifiedAt 会自动设置
+user := User{
+    Name:  "张三",
+    Email: "zhangsan@example.com",
+}
+db.Create(&user)
+```
+
+### DateTime 自定义时间类型
+
+提供了自定义的时间类型，支持 JSON 序列化和数据库存储：
+
+```go
+type DateTime time.Time
+```
+
+**特性：**
+
+-   自动格式化为 "2006-01-02 15:04:05" 格式
+-   支持 JSON 序列化和反序列化
+-   支持数据库扫描和值转换
+-   支持字符串表示
+
+**使用示例：**
+
+```go
+type Event struct {
+    ID        uint     `gorm:"primarykey" json:"id"`
+    Title     string   `json:"title"`
+    StartTime DateTime `gorm:"type:datetime" json:"start_time"`
+    EndTime   DateTime `gorm:"type:datetime" json:"end_time"`
+}
+
+// 创建事件
+event := Event{
+    Title:     "会议",
+    StartTime: DateTime(time.Now()),
+    EndTime:   DateTime(time.Now().Add(time.Hour)),
+}
+
+// JSON 序列化会自动格式化为字符串
+jsonData, _ := json.Marshal(event)
+// 输出: {"id":0,"title":"会议","start_time":"2025-06-25 13:45:30","end_time":"2025-06-25 14:45:30"}
+```
 
 ## 配置说明
 

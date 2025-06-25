@@ -2,7 +2,7 @@
 
 ## 简介
 
-`gocommon` 是一套面向 Go 后端项目的通用基础库，涵盖数据库、缓存、日志、配置、API 响应、工具函数、中间件、告警、调试等常用能力，助力快速构建高质量服务。
+`gocommon` 是一套面向 Go 后端项目的通用基础库，涵盖数据库、缓存、日志、配置、API 响应、工具函数、中间件、告警、调试、服务发现等常用能力，助力快速构建高质量服务。
 
 ## 目录结构
 
@@ -20,9 +20,11 @@
 ├── http/            # HTTP 客户端封装
 ├── logger/          # 日志组件
 ├── middleware/      # Gin/HTTP 通用中间件
+├── nacos/           # Nacos 配置管理与服务发现
 ├── response/        # API 响应结构与绑定
 ├── safego/          # goroutine 安全工具
 ├── utils/           # 常用工具函数（加解密、IP、时间、随机数等）
+└── .vscode/         # VS Code 开发配置
 ```
 
 ## 主要功能模块
@@ -30,9 +32,19 @@
 ### 数据库与存储（db/）
 
 -   **MySQL**：[连接池、健康检查、事务、模型等](./db/mysql/README.md)
+    -   支持 BaseModel 基础模型，包含 ID、CreatedAt、ModifiedAt 字段
+    -   自定义 DateTime 类型，支持 JSON 序列化
 -   **MongoDB**：[连接池、健康检查、事务等](./db/mongodb/README.md)
 -   **Redis**：[连接池、健康检查、Hook 等](./db/redis/README.md)
 -   **Elasticsearch**：[索引/文档管理、健康检查等](./db/elasticsearch/README.md)
+
+### 服务发现与配置管理（nacos/）
+
+-   **Nacos 模块**：[配置管理和服务发现功能](./nacos/README.md)
+-   支持多实例配置管理
+-   配置的发布、获取、删除及监听
+-   服务注册与发现
+-   自动配置加载和初始化
 
 ### 日志（logger/）
 
@@ -41,6 +53,10 @@
 ### 配置（config/）
 
 -   支持 toml/yaml/json，自动映射结构体
+-   支持热更新配置
+    -   http/
+    -   alarm/
+    -   debug/
 
 ### API 响应（response/）
 
@@ -83,18 +99,13 @@
     ```
 2. 参考各模块目录下的 example.go 或测试用例，快速集成到你的项目。
 
-## 测试
+## 开发环境配置
 
-建议在本地或 CI 环境下运行所有测试：
+项目包含完整的 VS Code 配置，支持：
 
-```sh
-go test ./...
-```
+-   **单测配置**：所有模块的测试和覆盖率测试
+-   **调试配置**：支持断点调试和性能分析
+-   **任务配置**：构建、测试、代码检查等常用任务
+-   **代码格式化**：自动格式化和导入整理
 
-## 贡献
-
-欢迎 issue、PR 及建议！
-
-## License
-
-MIT
+详细配置说明请参考 [.vscode/README.md](.vscode/README.md)
