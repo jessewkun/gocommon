@@ -13,8 +13,8 @@ import (
 const TAG = "HTTP"
 
 type Config struct {
-	TransparentParameter []string `mapstructure:"transparent_parameter"`
-	IsTraceLog           bool     `mapstructure:"is_trace_log"`
+	TransparentParameter []string `mapstructure:"transparent_parameter" json:"transparent_parameter"`
+	IsLog                bool     `mapstructure:"is_log" json:"is_log"`
 }
 
 func (c *Config) Reload(v *viper.Viper) {

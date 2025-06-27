@@ -9,8 +9,8 @@ import (
 )
 
 type Config struct {
-	Module []string `toml:"module" mapstructure:"module"` // debug模块, 可选值 mysql,http, + 自定义业务模块
-	Mode   string   `toml:"mode" mapstructure:"mode"`     // debug方式, 可选值 log, console
+	Module []string `mapstructure:"module" json:"module"` // debug模块, 可选值 mysql,http, + 自定义业务模块
+	Mode   string   `mapstructure:"mode" json:"mode"`     // debug方式, 可选值 log, console
 }
 
 func (c *Config) Reload(v *viper.Viper) {

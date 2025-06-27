@@ -38,7 +38,6 @@ func TestMain(m *testing.M) {
 			SocketTimeout:          10,
 			ReadPreference:         "primary",
 			WriteConcern:           "majority",
-			IsLog:                  false,
 		},
 	}
 

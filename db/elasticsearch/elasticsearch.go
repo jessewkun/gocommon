@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	gocommonlog "github.com/jessewkun/gocommon/logger"
+	"github.com/jessewkun/gocommon/logger"
 )
 
 const TAG = "ELASTICSEARCH"
@@ -25,7 +25,7 @@ func Init() error {
 	for dbName, conf := range Cfgs {
 		if err := newClient(dbName, conf); err != nil {
 			initErr = fmt.Errorf("connect to elasticsearch %s faild, error: %w", dbName, err)
-			gocommonlog.ErrorWithMsg(context.Background(), TAG, initErr.Error())
+			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
 			break
 		}
 	}
@@ -66,7 +66,7 @@ func newClient(dbName string, cfg *Config) error {
 	}
 
 	connList.conns[dbName] = &Client{ES: es}
-	gocommonlog.Info(context.Background(), TAG, "connect to elasticsearch %s succ", dbName)
+	logger.Info(context.Background(), TAG, "connect to elasticsearch %s succ", dbName)
 
 	return nil
 }

@@ -12,9 +12,9 @@ type Client struct {
 // Config 用于初始化 ES 客户端
 // Example: Config{Addresses: []string{"http://localhost:9200"}}
 type Config struct {
-	Addresses []string `toml:"addresses" mapstructure:"addresses"`
-	Username  string   `toml:"username" mapstructure:"username"`
-	Password  string   `toml:"password" mapstructure:"password"`
+	Addresses []string `mapstructure:"addresses" json:"addresses"`
+	Username  string   `mapstructure:"username" json:"username"`
+	Password  string   `mapstructure:"password" json:"password"`
 }
 
 // Cfg is the configuration instance for the elasticsearch package.

@@ -52,11 +52,12 @@
 
 ### 配置（config/）
 
--   支持 toml/yaml/json，自动映射结构体
+-   支持 TOML/JSON/YAML 格式配置文件，自动映射结构体
 -   支持热更新配置
     -   http/
     -   alarm/
     -   debug/
+-   提供完整的配置文件示例：`config.toml.example` 和 `config.json.example`
 
 ### API 响应（response/）
 

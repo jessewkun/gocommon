@@ -5,17 +5,17 @@ import (
 )
 
 type Config struct {
-	Addrs              []string `toml:"addrs" mapstructure:"addrs"`                               // redis addrs ip:port
-	Password           string   `toml:"password" mapstructure:"password"`                         // redis password
-	Db                 int      `toml:"db" mapstructure:"db"`                                     // redis db
-	IsLog              bool     `toml:"is_log" mapstructure:"is_log"`                             // 是否记录日志
-	PoolSize           int      `toml:"pool_size" mapstructure:"pool_size"`                       // 连接池大小
-	IdleTimeout        int      `toml:"idle_timeout" mapstructure:"idle_timeout"`                 // 空闲连接超时时间，单位秒
-	IdleCheckFrequency int      `toml:"idle_check_frequency" mapstructure:"idle_check_frequency"` // 空闲连接检查频率，单位秒
-	MinIdleConns       int      `toml:"min_idle_conns" mapstructure:"min_idle_conns"`             // 最小空闲连接数
-	MaxRetries         int      `toml:"max_retries" mapstructure:"max_retries"`                   // 最大重试次数
-	DialTimeout        int      `toml:"dial_timeout" mapstructure:"dial_timeout"`                 // 连接超时时间，单位秒
-	SlowThreshold      int      `toml:"slow_threshold" mapstructure:"slow_threshold"`             // 慢查询阈值，单位毫秒
+	Addrs              []string `mapstructure:"addrs" json:"addrs"`                               // redis addrs ip:port
+	Password           string   `mapstructure:"password" json:"password"`                         // redis password
+	Db                 int      `mapstructure:"db" json:"db"`                                     // redis db
+	IsLog              bool     `mapstructure:"is_log" json:"is_log"`                             // 是否记录日志
+	PoolSize           int      `mapstructure:"pool_size" json:"pool_size"`                       // 连接池大小
+	IdleTimeout        int      `mapstructure:"idle_timeout" json:"idle_timeout"`                 // 空闲连接超时时间，单位秒
+	IdleCheckFrequency int      `mapstructure:"idle_check_frequency" json:"idle_check_frequency"` // 空闲连接检查频率，单位秒
+	MinIdleConns       int      `mapstructure:"min_idle_conns" json:"min_idle_conns"`             // 最小空闲连接数
+	MaxRetries         int      `mapstructure:"max_retries" json:"max_retries"`                   // 最大重试次数
+	DialTimeout        int      `mapstructure:"dial_timeout" json:"dial_timeout"`                 // 连接超时时间，单位秒
+	SlowThreshold      int      `mapstructure:"slow_threshold" json:"slow_threshold"`             // 慢查询阈值，单位毫秒
 }
 
 var Cfgs = make(map[string]*Config)

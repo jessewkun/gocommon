@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	gocommonlog "github.com/jessewkun/gocommon/logger"
+	"github.com/jessewkun/gocommon/logger"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients"
 	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
@@ -17,12 +17,12 @@ func Init() error {
 		err := setDefaultConfig(conf)
 		if err != nil {
 			initErr = fmt.Errorf("nacos %s setDefaultConfig error: %w", clientName, err)
-			gocommonlog.ErrorWithMsg(context.Background(), TAG, initErr.Error())
+			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
 			break
 		}
 		if err := newClient(clientName, conf); err != nil {
 			initErr = fmt.Errorf("connect to nacos %s failed, error: %w", clientName, err)
-			gocommonlog.ErrorWithMsg(context.Background(), TAG, initErr.Error())
+			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
 			break
 		}
 	}
@@ -118,7 +118,7 @@ func newClient(clientName string, conf *Config) error {
 	}
 
 	connList.clients[clientName] = client
-	gocommonlog.Info(context.Background(), TAG, "connect to nacos %s succ", clientName)
+	logger.Info(context.Background(), TAG, "connect to nacos %s succ", clientName)
 
 	return nil
 }
@@ -145,9 +145,9 @@ func Close() error {
 		if client != nil {
 			if err := client.Close(); err != nil {
 				lastErr = fmt.Errorf("close nacos %s failed: %w", clientName, err)
-				gocommonlog.ErrorWithMsg(context.Background(), TAG, lastErr.Error())
+				logger.ErrorWithMsg(context.Background(), TAG, lastErr.Error())
 			} else {
-				gocommonlog.Info(context.Background(), TAG, "close nacos %s succ", clientName)
+				logger.Info(context.Background(), TAG, "close nacos %s succ", clientName)
 			}
 		}
 	}

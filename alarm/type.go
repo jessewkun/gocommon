@@ -8,8 +8,8 @@ import (
 )
 
 type Config struct {
-	BarkIds []string `toml:"bark_ids" mapstructure:"bark_ids"` // Bark 设备 ID 列表
-	Timeout int      `toml:"timeout" mapstructure:"timeout"`   // 请求超时时间（秒）
+	BarkIds []string `mapstructure:"bark_ids" json:"bark_ids"` // Bark 设备 ID 列表
+	Timeout int      `mapstructure:"timeout" json:"timeout"`   // 请求超时时间（秒）
 }
 
 // Reload 重新加载 alarm 配置.

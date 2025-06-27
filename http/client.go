@@ -40,7 +40,7 @@ func NewClient(opt Option) *Client {
 	}
 
 	// 日志逻辑现在尊重模块的配置，可以被 Option 覆盖
-	isLog := Cfg.IsTraceLog
+	isLog := Cfg.IsLog
 	if opt.IsLog != nil {
 		isLog = *opt.IsLog
 	}

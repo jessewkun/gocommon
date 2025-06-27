@@ -18,13 +18,13 @@ type Client struct {
 
 // Config nacos配置
 type Config struct {
-	Host      string `mapstructure:"host"`      // nacos服务器地址
-	Port      uint64 `mapstructure:"port"`      // nacos服务器端口
-	Namespace string `mapstructure:"namespace"` // 命名空间
-	Group     string `mapstructure:"group"`     // 配置组
-	Username  string `mapstructure:"username"`  // 用户名
-	Password  string `mapstructure:"password"`  // 密码
-	Timeout   int    `mapstructure:"timeout"`   // 超时时间(毫秒)
+	Host      string `mapstructure:"host" json:"host"`           // nacos服务器地址
+	Port      uint64 `mapstructure:"port" json:"port"`           // nacos服务器端口
+	Namespace string `mapstructure:"namespace" json:"namespace"` // 命名空间
+	Group     string `mapstructure:"group" json:"group"`         // 配置组
+	Username  string `mapstructure:"username" json:"username"`   // 用户名
+	Password  string `mapstructure:"password" json:"password"`   // 密码
+	Timeout   int    `mapstructure:"timeout" json:"timeout"`     // 超时时间(毫秒)
 }
 
 // DefaultConfig 默认配置

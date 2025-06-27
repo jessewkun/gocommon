@@ -35,7 +35,6 @@ func ExampleMongoDBUsage() {
 			SocketTimeout:          30,
 			ReadPreference:         "primary",
 			WriteConcern:           "majority",
-			IsLog:                  true,
 		},
 		"replica": {
 			Uris:                   []string{"mongodb://localhost:27017,localhost:27018,localhost:27019"},
@@ -47,7 +46,6 @@ func ExampleMongoDBUsage() {
 			SocketTimeout:          30,
 			ReadPreference:         "secondaryPreferred",
 			WriteConcern:           "majority",
-			IsLog:                  true,
 		},
 	}
 

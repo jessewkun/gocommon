@@ -41,9 +41,9 @@ func RegisterCallback(key string, fn func() error) {
 
 // BaseConfig 基础配置
 type BaseConfig struct {
-	Mode   string `mapstructure:"mode"`   // 运行模式, debug 开发, release 生产, test 测试
-	Port   string `mapstructure:"port"`   // 服务端口, 默认 :8000
-	Domain string `mapstructure:"domain"` // 服务域名, 默认 http://localhost:8000
+	Mode   string `mapstructure:"mode" json:"mode"`     // 运行模式, debug 开发, release 生产, test 测试
+	Port   string `mapstructure:"port" json:"port"`     // 服务端口, 默认 :8000
+	Domain string `mapstructure:"domain" json:"domain"` // 服务域名, 默认 http://localhost:8000
 }
 
 // Cfg is the global instance for base configuration.

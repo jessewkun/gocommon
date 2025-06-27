@@ -5,19 +5,19 @@ import (
 	"fmt"
 	"log"
 
-	gocommonlog "github.com/jessewkun/gocommon/logger"
+	"github.com/jessewkun/gocommon/logger"
 )
 
 func Example() {
 	// 初始化 logger
-	cfg := gocommonlog.DefaultConfig()
+	cfg := logger.DefaultConfig()
 	cfg.Path = "./test.log"
 	cfg.MaxSize = 100
 	cfg.MaxAge = 30
 	cfg.MaxBackup = 10
 	cfg.AlarmLevel = "warn"
-	gocommonlog.Cfg = cfg
-	if err := gocommonlog.Init(); err != nil {
+	logger.Cfg = cfg
+	if err := logger.Init(); err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 
