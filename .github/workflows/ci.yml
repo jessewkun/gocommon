@@ -1,15 +1,11 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
 
 env:
   GO_VERSION: '1.23.10'
-  GOLANGCI_LINT_VERSION: 'v1.60.0'
-  GOSEC_VERSION: 'v2.20.0'
 
 jobs:
   # 代码质量检查
@@ -51,7 +47,7 @@ jobs:
 
       - name: 安装 gosec
         run: |
-          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
 
       - name: 运行 gosec 安全扫描
         run: gosec -fmt=json -out=security-report.json ./... || true
@@ -72,11 +68,7 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: 123456
-          MYSQL_DATABASE: test
-          MYSQL_USER: root
-          MYSQL_PASSWORD: 123456
-          MYSQL_HOST: 127.0.0.1
-          MYSQL_PORT: 3306
+          MYSQL_DATABASE: testdb
         ports:
           - 3306:3306
         options: >-
@@ -129,7 +121,7 @@ jobs:
         run: go mod download
 
       - name: 运行单元测试
-        run: go test -v ./...
+        run: go test -v ./... -coverprofile=coverage.out
 
       - name: 生成测试覆盖率报告
         run: go tool cover -html=coverage.out -o coverage.html
