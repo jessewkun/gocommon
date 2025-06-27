@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 env:
   GO_VERSION: '1.23.10'
@@ -29,7 +29,7 @@ jobs:
       - name: 安装 golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
-          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          version: v1.60.0
           args: --timeout=10m --verbose
 
       - name: 运行 golangci-lint
@@ -51,7 +51,7 @@ jobs:
 
       - name: 安装 gosec
         run: |
-          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@${{ env.GOSEC_VERSION }}
+          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
 
       - name: 运行 gosec 安全扫描
         run: gosec -fmt=json -out=security-report.json ./... || true

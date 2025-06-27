@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/jessewkun/gocommon/logger"
 	"github.com/jessewkun/gocommon/response"
 )
@@ -54,7 +54,7 @@ var (
 // Claims JWT声明
 type Claims struct {
 	UserId int `json:"user_id"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 // JwtAuth 返回一个JWT认证中间件
@@ -118,7 +118,7 @@ func JwtAuth(config *JWTConfig) gin.HandlerFunc {
 		}
 
 		// 检查是否需要刷新token
-		if time.Until(time.Unix(claims.ExpiresAt, 0)) < jwtConfig.RefreshTime {
+		if time.Until(claims.ExpiresAt.Time) < jwtConfig.RefreshTime {
 			newToken, err := refreshToken(claims)
 			if err != nil {
 				if jwtConfig.EnableLog {
@@ -139,9 +139,9 @@ func CreateJwtToken(userId int) (string, error) {
 	expirationTime := time.Now().Add(jwtConfig.Expiration)
 	claims := &Claims{
 		UserId: userId,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: expirationTime.Unix(),
-			IssuedAt:  time.Now().Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -162,8 +162,8 @@ func RevokeToken(token string) {
 
 // refreshToken 刷新token
 func refreshToken(claims *Claims) (string, error) {
-	claims.ExpiresAt = time.Now().Add(jwtConfig.Expiration).Unix()
-	claims.IssuedAt = time.Now().Unix()
+	claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(jwtConfig.Expiration))
+	claims.IssuedAt = jwt.NewNumericDate(time.Now())
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtConfig.SecretKey)
 }
