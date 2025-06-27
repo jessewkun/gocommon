@@ -25,7 +25,6 @@ jobs:
       - name: 安装 golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
-          version: v1.60.0
           args: --timeout=10m --verbose
 
       - name: 运行 golangci-lint
@@ -133,14 +132,6 @@ jobs:
           path: |
             coverage.out
             coverage.html
-
-      - name: 上传覆盖率到 Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.out
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
 
   # 依赖检查
   dependency-check:
