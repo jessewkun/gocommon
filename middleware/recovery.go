@@ -18,7 +18,7 @@ func Recovery() gin.HandlerFunc {
 		defer func() {
 			if r := recover(); r != nil {
 				trace := PanicTrace(2)
-				logger.ErrorWithField(c.Request.Context(), TAG, "PANIC", map[string]interface{}{
+				logger.ErrorWithField(c.Request.Context(), "RECOVERY", "PANIC", map[string]interface{}{
 					"recover": r,
 					"panic":   string(trace),
 				})
