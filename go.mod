@@ -3,6 +3,7 @@ module github.com/jessewkun/gocommon
 go 1.23.10
 
 require (
+	github.com/allegro/bigcache v1.2.1
 	github.com/elastic/go-elasticsearch/v8 v8.18.1
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/gin-contrib/cors v1.7.5

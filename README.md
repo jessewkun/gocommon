@@ -15,7 +15,8 @@
 │   ├── mysql/
 │   ├── mongodb/
 │   ├── redis/
-│   └── elasticsearch/
+│   ├── elasticsearch/
+│   └── localcache/  # 本地缓存模块
 ├── debug/           # 调试与动态开关
 ├── http/            # HTTP 客户端封装
 ├── logger/          # 日志组件
@@ -37,6 +38,11 @@
 -   **MongoDB**：[连接池、健康检查、事务等](./db/mongodb/README.md)
 -   **Redis**：[连接池、健康检查、Hook 等](./db/redis/README.md)
 -   **Elasticsearch**：[索引/文档管理、健康检查等](./db/elasticsearch/README.md)
+-   **localcache**：[高性能本地缓存，基于 BigCache](./db/localcache/README.md)
+    -   零 GC 压力，适合高并发、大容量缓存场景
+    -   支持 TTL、类型安全缓存、缓存管理等功能
+    -   提供 Cache、TypedCache、Manager 三种接口
+    -   包含完整的技术选型对比文档
 
 ### 服务发现与配置管理（nacos/）
 
