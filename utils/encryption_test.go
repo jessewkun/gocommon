@@ -25,13 +25,6 @@ func TestMd5X(t *testing.T) {
 }
 
 func TestAesCbc_Encode(t *testing.T) {
-	type fields struct {
-		Key string
-		Iv  string
-	}
-	type args struct {
-		data string
-	}
 	t.Run("TestAesCbc_Encode1", func(t *testing.T) {
 		ac := &AesCbc{
 			Key: "1234567890123456",
