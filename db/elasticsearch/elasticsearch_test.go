@@ -41,7 +41,7 @@ func TestElasticsearch_BasicFlow(t *testing.T) {
 
 	// 健康检查
 	hc := client.HealthCheck()
-	if hc == nil || len(hc) == 0 {
+	if len(hc) == 0 {
 		t.Skip("健康检查失败，跳过测试")
 	}
 

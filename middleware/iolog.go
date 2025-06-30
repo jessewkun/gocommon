@@ -88,7 +88,7 @@ func IOLog(config *IOLogConfig) gin.HandlerFunc {
 		// 获取响应体
 		var responseBody interface{}
 		if config.LogResponseBody {
-			responseBody, _ = c.Get(constant.CTX_API_OUTPUT)
+			responseBody, _ = c.Get(string(constant.CtxAPIOutput))
 		}
 
 		// 构建日志字段

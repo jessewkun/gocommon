@@ -17,6 +17,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// HTTPContextKey 定义 HTTP context key 的类型
+type HTTPContextKey string
+
+const (
+	// UserIDKey 用户ID key
+	UserIDKey HTTPContextKey = "X-User-ID"
+	// TraceIDKey 追踪ID key
+	TraceIDKey HTTPContextKey = "X-Trace-ID"
+	// CustomIDKey 自定义ID key
+	CustomIDKey HTTPContextKey = "X-Custom-ID"
+)
+
 // logTestMutex is used to ensure that tests modifying the global logger config do not run in parallel.
 var logTestMutex sync.Mutex
 
@@ -590,16 +602,11 @@ func TestClient_TransparentParameter(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-		// 验证透传参数是否被正确发送 - 尝试多种可能的header名称
+		// 验证透传参数是否被正确发送
 		headers := receivedHeaders[len(receivedHeaders)-1]
-		userID := headers["X-User-ID"]
-		if userID == "" {
-			userID = headers["X-User-Id"]
-		}
-		traceID := headers["X-Trace-ID"]
-		if traceID == "" {
-			traceID = headers["X-Trace-Id"]
-		}
+
+		userID := headers["X-User-Id"]
+		traceID := headers["X-Trace-Id"]
 
 		assert.Equal(t, "12345", userID, "X-User-ID header not found")
 		assert.Equal(t, "trace-67890", traceID, "X-Trace-ID header not found")
@@ -642,17 +649,8 @@ func TestClient_TransparentParameter(t *testing.T) {
 		// 验证第二次请求包含了新添加的透传参数
 		headers := receivedHeaders[len(receivedHeaders)-1]
 		userID := headers["X-User-Id"]
-		if userID == "" {
-			userID = headers["X-User-ID"]
-		}
 		traceID := headers["X-Trace-Id"]
-		if traceID == "" {
-			traceID = headers["X-Trace-ID"]
-		}
 		customID := headers["X-Custom-Id"]
-		if customID == "" {
-			customID = headers["X-Custom-ID"]
-		}
 
 		assert.Equal(t, "22222", userID, "X-User-ID header should be updated")
 		assert.Equal(t, "trace-22222", traceID, "X-Trace-ID header should be updated")

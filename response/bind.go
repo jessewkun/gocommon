@@ -2,14 +2,7 @@ package response
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/go-playground/validator/v10"
 )
-
-var validate *validator.Validate
-
-func init() {
-	validate = validator.New()
-}
 
 // BindAndValidate 统一绑定和校验（自动判断来源类型）
 func BindAndValidate(ctx *gin.Context, obj interface{}) bool {

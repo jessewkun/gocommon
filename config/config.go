@@ -1,3 +1,4 @@
+// Package config 提供配置管理和热重载功能
 package config
 
 import (
@@ -17,7 +18,7 @@ var (
 	callbacksMutex sync.RWMutex
 )
 
-// 配置注册，用于注册模块配置，key 为模块名，cfgPtr 为模块配置结构体指针
+// Register 配置注册，用于注册模块配置，key 为模块名，cfgPtr 为模块配置结构体指针
 func Register(key string, cfgPtr interface{}) {
 	modulesMutex.Lock()
 	defer modulesMutex.Unlock()
@@ -77,7 +78,7 @@ func Init(configPath string) (*BaseConfig, error) {
 			fmt.Printf("config: key '%s' not found in config file, module will use default values\n", key)
 		}
 		if err := v.UnmarshalKey(key, cfgPtr); err != nil {
-			return nil, fmt.Errorf("config: failed to unmarshal key '%s': %v\n", key, err)
+			return nil, fmt.Errorf("config: failed to unmarshal key '%s': %v", key, err)
 		}
 	}
 

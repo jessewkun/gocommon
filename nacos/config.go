@@ -7,9 +7,9 @@ import (
 )
 
 // GetConfig 获取配置
-func (c *Client) GetConfig(dataId string) (string, error) {
+func (c *Client) GetConfig(dataID string) (string, error) {
 	content, err := c.configClient.GetConfig(vo.ConfigParam{
-		DataId: dataId,
+		DataId: dataID,
 		Group:  c.config.Group,
 	})
 	if err != nil {
@@ -19,9 +19,9 @@ func (c *Client) GetConfig(dataId string) (string, error) {
 }
 
 // PublishConfig 发布配置
-func (c *Client) PublishConfig(dataId, content string) error {
+func (c *Client) PublishConfig(dataID, content string) error {
 	success, err := c.configClient.PublishConfig(vo.ConfigParam{
-		DataId:  dataId,
+		DataId:  dataID,
 		Group:   c.config.Group,
 		Content: content,
 	})
@@ -35,9 +35,9 @@ func (c *Client) PublishConfig(dataId, content string) error {
 }
 
 // DeleteConfig 删除配置
-func (c *Client) DeleteConfig(dataId string) error {
+func (c *Client) DeleteConfig(dataID string) error {
 	success, err := c.configClient.DeleteConfig(vo.ConfigParam{
-		DataId: dataId,
+		DataId: dataID,
 		Group:  c.config.Group,
 	})
 	if err != nil {
@@ -50,20 +50,20 @@ func (c *Client) DeleteConfig(dataId string) error {
 }
 
 // ListenConfig 监听配置变化
-func (c *Client) ListenConfig(dataId string, onChange func(string, string, string)) error {
+func (c *Client) ListenConfig(dataID string, onChange func(string, string, string)) error {
 	return c.configClient.ListenConfig(vo.ConfigParam{
-		DataId: dataId,
+		DataId: dataID,
 		Group:  c.config.Group,
-		OnChange: func(namespace, group, dataId, data string) {
+		OnChange: func(namespace, group, dataID, data string) {
 			onChange(namespace, group, data)
 		},
 	})
 }
 
 // CancelListenConfig 取消监听配置
-func (c *Client) CancelListenConfig(dataId string) error {
+func (c *Client) CancelListenConfig(dataID string) error {
 	return c.configClient.CancelListenConfig(vo.ConfigParam{
-		DataId: dataId,
+		DataId: dataID,
 		Group:  c.config.Group,
 	})
 }

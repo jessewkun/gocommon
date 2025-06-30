@@ -8,7 +8,7 @@ const (
 	ModeTest    = "test"
 )
 
-// isDebug 是否是 debug 模式
+// IsDebug 是否是 debug 模式
 // 开发环境
 func IsDebug() bool {
 	return config.Cfg.Mode == ModeDebug

@@ -275,6 +275,6 @@ func SendAlarm(c context.Context, level string, tag string, msg string) {
 		}
 	}
 	if canAlarm {
-		alarm.SendBark(c, "[ONLINE]Service Alarm", fmt.Sprintf("tag: %s\nmsg: %s", tag, msg))
+		_ = alarm.SendBark(c, "[ONLINE]Service Alarm", fmt.Sprintf("tag: %s\nmsg: %s", tag, msg))
 	}
 }

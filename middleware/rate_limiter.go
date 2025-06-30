@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
@@ -130,6 +131,6 @@ func cleanupIPLimiters() {
 	// 这里可以添加清理逻辑，比如删除长时间未使用的 IP 限流器
 	// 为了简单起见，这里只是打印一下当前 IP 限流器的数量
 	if config.EnableLog {
-		logger.Info(nil, TAG, "Current IP limiters count: %d", len(config.IPLimiters))
+		logger.Info(context.Background(), TAG, "Current IP limiters count: %d", len(config.IPLimiters))
 	}
 }

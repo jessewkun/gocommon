@@ -11,7 +11,7 @@ type CrosConfig struct {
 	AllowHeaders   []string
 }
 
-// 配置 CORS
+// Cros 配置 CORS
 func Cros(crosConfig CrosConfig) gin.HandlerFunc {
 	return cors.New(cors.Config{
 		AllowMethods:     crosConfig.AllowMethods,
