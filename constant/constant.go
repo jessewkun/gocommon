@@ -1,8 +1,16 @@
+// Package constant 定义项目中使用的常量
 package constant
 
+// ContextKey 定义 context key 的类型
+type ContextKey string
+
 // 用于设置gin.Context中的key来存储返回结果，并在中间件中获取记录日志
-const CTX_API_OUTPUT = "api_output"
 
-const CTX_TRACE_ID = "trace_id"
+// CtxAPIOutput 用于设置gin.Context中的key来存储返回结果，并在中间件中获取记录日志
+const CtxAPIOutput ContextKey = "api_output"
 
-const CTX_USER_ID = "user_id"
+// CtxTraceID 用于设置gin.Context中的key来存储trace_id
+const CtxTraceID ContextKey = "trace_id"
+
+// CtxUserID 用于设置gin.Context中的key来存储user_id
+const CtxUserID ContextKey = "user_id"

@@ -19,12 +19,12 @@ func newTestContext() *gin.Context {
 	return c
 }
 
-func TestNewApiResult(t *testing.T) {
+func TestNewAPIResult(t *testing.T) {
 	c := newTestContext()
-	c.Set(constant.CTX_TRACE_ID, "trace123")
-	resp := NewApiResult(c, 0, "ok", map[string]interface{}{"a": 1})
-	if resp.Code != 0 || resp.Message != "ok" || resp.TraceId != "trace123" {
-		t.Errorf("NewApiResult 返回值不正确: %+v", resp)
+	c.Set(string(constant.CtxTraceID), "trace123")
+	resp := NewAPIResult(c, 0, "ok", map[string]interface{}{"a": 1})
+	if resp.Code != 0 || resp.Message != "ok" || resp.TraceID != "trace123" {
+		t.Errorf("NewAPIResult 返回值不正确: %+v", resp)
 	}
 }
 
@@ -45,7 +45,7 @@ func TestErrorResp(t *testing.T) {
 	}
 	// 非 CustomError
 	resp2 := ErrorResp(c, errors.New("other error"))
-	if resp2.Code != DEFAULT_ERROR_CODE {
+	if resp2.Code != DefaultErrorCode {
 		t.Errorf("ErrorResp 非自定义错误未返回默认错误码: %+v", resp2)
 	}
 }
@@ -99,11 +99,11 @@ func TestRateLimiterErrorResp(t *testing.T) {
 }
 
 func TestApiResult_String(t *testing.T) {
-	r := &ApiResult{Code: 1, Message: "msg", Data: 2, TraceId: "tid"}
+	r := &APIResult{Code: 1, Message: "msg", Data: 2, TraceID: "tid"}
 	str := r.String()
 	var m map[string]interface{}
 	if err := json.Unmarshal([]byte(str), &m); err != nil {
-		t.Errorf("ApiResult.String() 不是合法json: %s", str)
+		t.Errorf("APIResult.String() 不是合法json: %s", str)
 	}
 }
 

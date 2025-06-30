@@ -53,7 +53,7 @@ var (
 
 // Claims JWT声明
 type Claims struct {
-	UserId int `json:"user_id"`
+	UserID int `json:"user_id"`
 	jwt.RegisteredClaims
 }
 
@@ -129,16 +129,16 @@ func JwtAuth(config *JWTConfig) gin.HandlerFunc {
 			}
 		}
 
-		c.Set("user_id", claims.UserId)
+		c.Set("user_id", claims.UserID)
 		c.Next()
 	}
 }
 
 // CreateJwtToken 创建JWT token
-func CreateJwtToken(userId int) (string, error) {
+func CreateJwtToken(userID int) (string, error) {
 	expirationTime := time.Now().Add(jwtConfig.Expiration)
 	claims := &Claims{
-		UserId: userId,
+		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

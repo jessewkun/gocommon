@@ -21,9 +21,9 @@ func TestCopyCtx(t *testing.T) {
 		{
 			name: "test",
 			args: args{
-				ctx: context.WithValue(context.Background(), constant.CTX_USER_ID, 1),
+				ctx: context.WithValue(context.Background(), constant.CtxUserID, 1),
 			},
-			want: context.WithValue(context.Background(), constant.CTX_USER_ID, 1),
+			want: context.WithValue(context.Background(), constant.CtxUserID, 1),
 		},
 	}
 	for _, tt := range tests {
