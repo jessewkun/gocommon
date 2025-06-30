@@ -17,7 +17,7 @@ type Config struct {
 	Password  string   `mapstructure:"password" json:"password"`
 }
 
-// Cfg is the configuration instance for the elasticsearch package.
+// Cfgs is the configuration instance for the elasticsearch package.
 var Cfgs = make(map[string]*Config)
 
 func init() {

@@ -130,9 +130,9 @@ func newClient(dbName string, conf *Config) error {
 		case "majority":
 			clientOptions.SetWriteConcern(writeconcern.Majority())
 		case "1":
-			clientOptions.SetWriteConcern(writeconcern.New(writeconcern.W(1)))
+			clientOptions.SetWriteConcern(writeconcern.W1())
 		case "0":
-			clientOptions.SetWriteConcern(writeconcern.New(writeconcern.W(0)))
+			clientOptions.SetWriteConcern(writeconcern.Unacknowledged())
 		default:
 			clientOptions.SetWriteConcern(writeconcern.Majority())
 		}

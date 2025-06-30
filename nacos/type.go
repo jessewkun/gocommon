@@ -13,7 +13,6 @@ type Client struct {
 	configClient config_client.IConfigClient
 	namingClient naming_client.INamingClient
 	config       *Config
-	mu           sync.RWMutex
 }
 
 // Config nacos配置
@@ -40,7 +39,7 @@ func DefaultConfig() *Config {
 	}
 }
 
-// 全局配置管理
+// Cfgs 全局配置管理
 var Cfgs = make(map[string]*Config)
 
 const TAG = "NACOS"
@@ -73,7 +72,7 @@ type ServiceInfo struct {
 
 // ConfigInfo 配置信息
 type ConfigInfo struct {
-	DataId  string `json:"data_id"`
+	DataID  string `json:"data_id"`
 	Group   string `json:"group"`
 	Content string `json:"content"`
 }
@@ -88,6 +87,6 @@ type ServiceChangeEvent struct {
 type ConfigChangeEvent struct {
 	Namespace string `json:"namespace"`
 	Group     string `json:"group"`
-	DataId    string `json:"data_id"`
+	DataID    string `json:"data_id"`
 	Content   string `json:"content"`
 }

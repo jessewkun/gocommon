@@ -22,7 +22,7 @@ func init() {
 	config.RegisterCallback("mongodb", Init)
 }
 
-// MongoHealthStatus MongoDB 健康状态
+// HealthStatus MongoDB 健康状态
 type HealthStatus struct {
 	Status    string `json:"status"`    // 状态：success/error
 	Error     string `json:"error"`     // 错误信息

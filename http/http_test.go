@@ -17,6 +17,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// HTTPContextKey 定义 HTTP context key 的类型
+type HTTPContextKey string
+
+const (
+	// UserIDKey 用户ID key
+	UserIDKey HTTPContextKey = "X-User-ID"
+	// TraceIDKey 追踪ID key
+	TraceIDKey HTTPContextKey = "X-Trace-ID"
+	// CustomIDKey 自定义ID key
+	CustomIDKey HTTPContextKey = "X-Custom-ID"
+)
+
 // logTestMutex is used to ensure that tests modifying the global logger config do not run in parallel.
 var logTestMutex sync.Mutex
 
@@ -579,8 +591,8 @@ func TestClient_TransparentParameter(t *testing.T) {
 	})
 
 	t.Run("透传参数测试", func(t *testing.T) {
-		ctx := context.WithValue(context.Background(), "X-User-ID", "12345")
-		ctx = context.WithValue(ctx, "X-Trace-ID", "trace-67890")
+		ctx := context.WithValue(context.Background(), UserIDKey, "12345")
+		ctx = context.WithValue(ctx, TraceIDKey, "trace-67890")
 
 		req := RequestGet{
 			URL: server.URL + "/test/get",
@@ -607,9 +619,9 @@ func TestClient_TransparentParameter(t *testing.T) {
 
 	t.Run("透传参数热更新测试", func(t *testing.T) {
 		// 第一次请求，使用原始配置
-		ctx1 := context.WithValue(context.Background(), "X-User-ID", "11111")
-		ctx1 = context.WithValue(ctx1, "X-Trace-ID", "trace-11111")
-		ctx1 = context.WithValue(ctx1, "X-Custom-ID", "custom-11111")
+		ctx1 := context.WithValue(context.Background(), UserIDKey, "11111")
+		ctx1 = context.WithValue(ctx1, TraceIDKey, "trace-11111")
+		ctx1 = context.WithValue(ctx1, CustomIDKey, "custom-11111")
 
 		req1 := RequestGet{
 			URL: server.URL + "/test/get",
@@ -627,9 +639,9 @@ func TestClient_TransparentParameter(t *testing.T) {
 		}()
 
 		// 第二次请求，使用更新后的配置
-		ctx2 := context.WithValue(context.Background(), "X-User-ID", "22222")
-		ctx2 = context.WithValue(ctx2, "X-Trace-ID", "trace-22222")
-		ctx2 = context.WithValue(ctx2, "X-Custom-ID", "custom-22222")
+		ctx2 := context.WithValue(context.Background(), UserIDKey, "22222")
+		ctx2 = context.WithValue(ctx2, TraceIDKey, "trace-22222")
+		ctx2 = context.WithValue(ctx2, CustomIDKey, "custom-22222")
 
 		req2 := RequestGet{
 			URL: server.URL + "/test/get",

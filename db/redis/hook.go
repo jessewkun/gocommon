@@ -9,6 +9,14 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
+// RedisContextKey 定义 Redis context key 的类型
+type RedisContextKey string
+
+const (
+	// RedisStartTimeKey Redis 开始时间 key
+	RedisStartTimeKey RedisContextKey = "redis_start_time"
+)
+
 // RedisHook Redis钩子
 type RedisHook struct {
 	slowThreshold time.Duration // 慢查询阈值
@@ -25,12 +33,12 @@ func newRedisHook(slowThreshold time.Duration) *RedisHook {
 }
 
 func (h *RedisHook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (context.Context, error) {
-	ctx = context.WithValue(ctx, "redis_start_time", time.Now())
+	ctx = context.WithValue(ctx, RedisStartTimeKey, time.Now())
 	return ctx, nil
 }
 
 func (h *RedisHook) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
-	startTime := ctx.Value("redis_start_time").(time.Time)
+	startTime := ctx.Value(RedisStartTimeKey).(time.Time)
 	duration := time.Since(startTime)
 
 	fields := map[string]interface{}{
@@ -55,12 +63,12 @@ func (h *RedisHook) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 }
 
 func (h *RedisHook) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cmder) (context.Context, error) {
-	ctx = context.WithValue(ctx, "redis_start_time", time.Now())
+	ctx = context.WithValue(ctx, RedisStartTimeKey, time.Now())
 	return ctx, nil
 }
 
 func (h *RedisHook) AfterProcessPipeline(ctx context.Context, cmds []redis.Cmder) error {
-	startTime := ctx.Value("redis_start_time").(time.Time)
+	startTime := ctx.Value(RedisStartTimeKey).(time.Time)
 	duration := time.Since(startTime)
 
 	// 统计成功和失败的命令数

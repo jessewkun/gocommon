@@ -19,7 +19,7 @@ func BuildQuery(data map[string]interface{}) string {
 	return q.Encode()
 }
 
-// Get
+// Get 发送GET请求
 func (c *Client) Get(ctx context.Context, req RequestGet) (*Response, error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
@@ -48,7 +48,7 @@ func (c *Client) Get(ctx context.Context, req RequestGet) (*Response, error) {
 	}, nil
 }
 
-// Post
+// Post 发送POST请求
 func (c *Client) Post(ctx context.Context, req RequestPost) (*Response, error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
@@ -77,7 +77,7 @@ func (c *Client) Post(ctx context.Context, req RequestPost) (*Response, error) {
 	}, nil
 }
 
-// Upload
+// Upload 上传文件
 func (c *Client) Upload(ctx context.Context, req RequestUpload) (respData *Response, err error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
@@ -108,7 +108,7 @@ func (c *Client) Upload(ctx context.Context, req RequestUpload) (respData *Respo
 	}, nil
 }
 
-// UploadWithFilePath
+// UploadWithFilePath 上传文件
 func (c *Client) UploadWithFilePath(ctx context.Context, req RequestUploadWithFilePath) (respData *Response, err error) {
 	// 设置请求超时
 	if req.Timeout > 0 {
@@ -139,7 +139,7 @@ func (c *Client) UploadWithFilePath(ctx context.Context, req RequestUploadWithFi
 	}, nil
 }
 
-// Download
+// Download 下载文件
 func (c *Client) Download(ctx context.Context, req RequestDownload) (respData *Response, err error) {
 	// 设置请求超时
 	if req.Timeout > 0 {

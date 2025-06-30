@@ -49,7 +49,7 @@ func (o *Option) String() string {
 		o.Headers, o.Timeout, o.Retry, o.RetryWaitTime, o.RetryMaxWaitTime, o.RetryWith5xxStatus, isLogStr)
 }
 
-// Response
+// Response 响应
 type Response struct {
 	StatusCode int             // http response status code
 	Body       []byte          // http response body
@@ -61,7 +61,7 @@ func (h *Response) String() string {
 	return fmt.Sprintf("Body: %s, Header: %v, StatusCode: %d, TraceInfo: %+v", h.Body, h.Header, h.StatusCode, h.TraceInfo)
 }
 
-// post request
+// RequestPost 请求
 type RequestPost struct {
 	URL     string            // 请求地址
 	Payload interface{}       // 请求数据
@@ -69,7 +69,7 @@ type RequestPost struct {
 	Timeout time.Duration     // 请求超时时间，如果为0则使用客户端默认超时时间
 }
 
-// upload request
+// RequestUpload 上传文件请求
 type RequestUpload struct {
 	URL       string            // 请求地址
 	FileBytes []byte            // 文件字节
@@ -80,7 +80,7 @@ type RequestUpload struct {
 	Timeout   time.Duration     // 请求超时时间，如果为0则使用客户端默认超时时间
 }
 
-// upload with file path request
+// RequestUploadWithFilePath 上传文件路径请求
 type RequestUploadWithFilePath struct {
 	URL      string            // 请求地址
 	FileName string            // 文件名
@@ -91,7 +91,7 @@ type RequestUploadWithFilePath struct {
 	Timeout  time.Duration     // 请求超时时间，如果为0则使用客户端默认超时时间
 }
 
-// download request
+// RequestDownload 下载文件请求
 type RequestDownload struct {
 	URL      string            // 请求地址
 	FilePath string            // 文件路径
@@ -99,7 +99,7 @@ type RequestDownload struct {
 	Timeout  time.Duration     // 请求超时时间，如果为0则使用客户端默认超时时间
 }
 
-// get request
+// RequestGet 获取请求
 type RequestGet struct {
 	URL     string            // 请求地址
 	Headers map[string]string // 请求头
