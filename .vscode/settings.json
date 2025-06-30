@@ -1,0 +1,30 @@
+{
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+    },
+    "files.eol": "\n",
+    "files.trimTrailingWhitespace": true,
+    "files.trimFinalNewlines": true,
+    "files.insertFinalNewline": true,
+
+    "go.lintTool": "staticcheck",
+    "go.lintOnSave": "package",
+    "go.lintFlags": ["--fast"],
+    "go.toolsManagement.autoUpdate": true,
+    "go.useLanguageServer": true,
+    "go.testFlags": ["-timeout=2m", "-v"],
+    "go.testOnSave": false,
+    "go.toolsEnvVars": {
+        "GO111MODULE": "on"
+    },
+    "gopls": {
+        "usePlaceholders": true,
+        "staticcheck": true,
+        "ui.diagnostic.analyses": {
+            "unusedparams": true
+        }
+    }
+}
