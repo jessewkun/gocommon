@@ -48,7 +48,7 @@ func DefaultIOLogConfig() *IOLogConfig {
 			`(?i)token`,
 			`(?i)secret`,
 		},
-		LogHeaders:    true,
+		LogHeaders:    false,
 		LogQuery:      true,
 		LogPath:       true,
 		LogClientInfo: true,
@@ -140,7 +140,7 @@ func IOLog(config *IOLogConfig) gin.HandlerFunc {
 		}
 
 		// 记录日志
-		logFunc(c.Request.Context(), TAG, "IOLOG", fields)
+		logFunc(c.Request.Context(), "IOLOG", "IOLOG", fields)
 	}
 }
 
