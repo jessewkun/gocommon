@@ -591,8 +591,8 @@ func TestClient_TransparentParameter(t *testing.T) {
 	})
 
 	t.Run("透传参数测试", func(t *testing.T) {
-		ctx := context.WithValue(context.Background(), UserIDKey, "12345")
-		ctx = context.WithValue(ctx, TraceIDKey, "trace-67890")
+		ctx := context.WithValue(context.Background(), "X-User-ID", "12345")
+		ctx = context.WithValue(ctx, "X-Trace-ID", "trace-67890")
 
 		req := RequestGet{
 			URL: server.URL + "/test/get",
@@ -602,16 +602,11 @@ func TestClient_TransparentParameter(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-		// 验证透传参数是否被正确发送 - 尝试多种可能的header名称
+		// 验证透传参数是否被正确发送
 		headers := receivedHeaders[len(receivedHeaders)-1]
-		userID := headers["X-User-ID"]
-		if userID == "" {
-			userID = headers["X-User-Id"]
-		}
-		traceID := headers["X-Trace-ID"]
-		if traceID == "" {
-			traceID = headers["X-Trace-Id"]
-		}
+
+		userID := headers["X-User-Id"]
+		traceID := headers["X-Trace-Id"]
 
 		assert.Equal(t, "12345", userID, "X-User-ID header not found")
 		assert.Equal(t, "trace-67890", traceID, "X-Trace-ID header not found")
@@ -619,9 +614,9 @@ func TestClient_TransparentParameter(t *testing.T) {
 
 	t.Run("透传参数热更新测试", func(t *testing.T) {
 		// 第一次请求，使用原始配置
-		ctx1 := context.WithValue(context.Background(), UserIDKey, "11111")
-		ctx1 = context.WithValue(ctx1, TraceIDKey, "trace-11111")
-		ctx1 = context.WithValue(ctx1, CustomIDKey, "custom-11111")
+		ctx1 := context.WithValue(context.Background(), "X-User-ID", "11111")
+		ctx1 = context.WithValue(ctx1, "X-Trace-ID", "trace-11111")
+		ctx1 = context.WithValue(ctx1, "X-Custom-ID", "custom-11111")
 
 		req1 := RequestGet{
 			URL: server.URL + "/test/get",
@@ -639,9 +634,9 @@ func TestClient_TransparentParameter(t *testing.T) {
 		}()
 
 		// 第二次请求，使用更新后的配置
-		ctx2 := context.WithValue(context.Background(), UserIDKey, "22222")
-		ctx2 = context.WithValue(ctx2, TraceIDKey, "trace-22222")
-		ctx2 = context.WithValue(ctx2, CustomIDKey, "custom-22222")
+		ctx2 := context.WithValue(context.Background(), "X-User-ID", "22222")
+		ctx2 = context.WithValue(ctx2, "X-Trace-ID", "trace-22222")
+		ctx2 = context.WithValue(ctx2, "X-Custom-ID", "custom-22222")
 
 		req2 := RequestGet{
 			URL: server.URL + "/test/get",
@@ -654,17 +649,8 @@ func TestClient_TransparentParameter(t *testing.T) {
 		// 验证第二次请求包含了新添加的透传参数
 		headers := receivedHeaders[len(receivedHeaders)-1]
 		userID := headers["X-User-Id"]
-		if userID == "" {
-			userID = headers["X-User-ID"]
-		}
 		traceID := headers["X-Trace-Id"]
-		if traceID == "" {
-			traceID = headers["X-Trace-ID"]
-		}
 		customID := headers["X-Custom-Id"]
-		if customID == "" {
-			customID = headers["X-Custom-ID"]
-		}
 
 		assert.Equal(t, "22222", userID, "X-User-ID header should be updated")
 		assert.Equal(t, "trace-22222", traceID, "X-Trace-ID header should be updated")

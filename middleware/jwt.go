@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"fmt"
+	"errors"
 	"net/http"
 	"strings"
 	"sync"
@@ -188,9 +188,9 @@ func handleError(c *gin.Context, errMsg string) {
 	}
 
 	if jwtConfig.ErrorHandler != nil {
-		jwtConfig.ErrorHandler(c, fmt.Errorf(errMsg))
+		jwtConfig.ErrorHandler(c, errors.New(errMsg))
 	} else {
-		c.JSON(http.StatusUnauthorized, response.ErrorResp(c, fmt.Errorf(errMsg)))
+		c.JSON(http.StatusUnauthorized, response.ErrorResp(c, errors.New(errMsg)))
 	}
 	c.Abort()
 }
