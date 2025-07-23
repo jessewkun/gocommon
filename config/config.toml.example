@@ -15,7 +15,11 @@ alarm_level = "warn"
 
 # 报警配置
 [alarm]
-bark_ids = ["your-bark-device-id"]
+  [alarm.bark]
+    bark_ids = ["jT64URJj8b6Fp9Y3nVKJiP"]
+  [alarm.feishu]
+    webhook_url = ""
+    secret = ""
 timeout = 5
 
 # HTTP客户端配置
@@ -37,7 +41,7 @@ mode = "console"
     conn_max_life = 3600
     slow_threshold = 500
     ignore_record_not_found_error = true
-    is_log = true
+    log_level = "info"
 
   [mysql.slave]
     dsn = [
@@ -49,7 +53,7 @@ mode = "console"
     conn_max_life = 3600
     slow_threshold = 1000
     ignore_record_not_found_error = true
-    is_log = true
+    log_level = "info"
 
 # Redis配置
 [redis]

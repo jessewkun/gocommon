@@ -68,10 +68,21 @@ func newClient(dbName string, conf *Config) error {
 		}
 	}
 
+	// 解析日志级别
 	logLevel := logger.Silent
-	if conf.IsLog {
+	switch conf.LogLevel {
+	case "error":
+		logLevel = logger.Error
+	case "warn":
+		logLevel = logger.Warn
+	case "info":
 		logLevel = logger.Info
+	case "silent", "":
+		logLevel = logger.Silent
+	default:
+		logLevel = logger.Silent
 	}
+
 	slowThreshold := 500 * time.Millisecond
 	if conf.SlowThreshold > 0 {
 		slowThreshold = time.Duration(conf.SlowThreshold) * time.Millisecond
@@ -130,24 +141,24 @@ func GetConn(dbIns string) (*gorm.DB, error) {
 	return connList.conns[dbIns], nil
 }
 
-// CloseMysql 关闭 MySQL 连接
-func Close() error {
+// Close 关闭 MySQL 连接
+func Close() map[string][]error {
 	connList.mu.Lock()
 	defer connList.mu.Unlock()
 
-	var lastErr error
+	errs := make(map[string][]error)
 	for dbName, db := range connList.conns {
 		if db != nil {
 			sqlDB, err := db.DB()
 			if err != nil {
-				lastErr = fmt.Errorf("get sql.DB for mysql %s failed: %w", dbName, err)
-				gocommonlog.ErrorWithMsg(context.Background(), TAG, lastErr.Error())
+				errs[dbName] = append(errs[dbName], fmt.Errorf("get sql.DB for mysql %s failed: %w", dbName, err))
+				gocommonlog.ErrorWithMsg(context.Background(), TAG, err.Error())
 				continue
 			}
 
 			if err := sqlDB.Close(); err != nil {
-				lastErr = fmt.Errorf("close mysql %s failed: %w", dbName, err)
-				gocommonlog.ErrorWithMsg(context.Background(), TAG, lastErr.Error())
+				errs[dbName] = append(errs[dbName], fmt.Errorf("close mysql %s failed: %w", dbName, err))
+				gocommonlog.ErrorWithMsg(context.Background(), TAG, err.Error())
 			} else {
 				gocommonlog.Info(context.Background(), TAG, "close mysql %s succ", dbName)
 			}
@@ -157,5 +168,5 @@ func Close() error {
 	// 清空连接列表
 	connList.conns = make(map[string]*gorm.DB)
 
-	return lastErr
+	return errs
 }

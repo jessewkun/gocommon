@@ -3,100 +3,64 @@ package alarm
 import (
 	"context"
 	"fmt"
-	"io"
-	"log"
-	"net/http"
 	"net/url"
 	"sync"
-	"time"
 )
 
 const (
-	TAG     = "ALARM"
 	barkAPI = "https://api.day.app/%s/%s/%s"
 )
 
-var (
-	client *http.Client
-	mu     sync.RWMutex
-)
-
-const MaxRetry = 3
-
-func Init() error {
-	mu.Lock()
-	defer mu.Unlock()
-
-	if Cfg == nil || len(Cfg.BarkIds) == 0 {
-		client = nil
-		return nil
-	}
-
-	client = &http.Client{
-		Timeout: time.Duration(Cfg.Timeout) * time.Second,
-	}
-
-	return nil
+type Bark struct {
+	BarkIds []string `mapstructure:"bark_ids" json:"bark_ids"` // Bark 设备 ID 列表
 }
 
-func SendBark(ctx context.Context, title, content string) error {
-	mu.RLock()
-	ids := Cfg.BarkIds
-	c := client
-	mu.RUnlock()
-
-	if c == nil || len(ids) == 0 {
-		return fmt.Errorf("bark is not configured or initialized")
+// Send 发送 Bark 消息
+func (b *Bark) Send(ctx context.Context, title string, content []string) error {
+	if len(b.BarkIds) == 0 {
+		return fmt.Errorf("bark is not configured")
 	}
 
-	for _, id := range ids {
-		if err := sendWithRetry(ctx, id, title, content); err != nil {
-			log.Printf("Failed to send bark to %s: %v", id, err)
-			continue
+	// 将多行内容合并为单行，用换行符分隔
+	contentStr := ""
+	for i, line := range content {
+		if i > 0 {
+			contentStr += "\n"
 		}
-		log.Printf("Successfully sent bark to %s", id)
+		contentStr += line
 	}
 
-	return nil
-}
+	// 并发向所有 Bark 设备发送消息
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var errors []error
 
-func sendWithRetry(ctx context.Context, id, title, content string) error {
-	var lastErr error
-	for i := 0; i < MaxRetry; i++ {
-		if err := send(ctx, id, title, content); err != nil {
-			lastErr = err
-			time.Sleep(time.Second * time.Duration(i+1))
-			continue
-		}
-		return nil
-	}
-	return lastErr
-}
+	for _, barkID := range b.BarkIds {
+		wg.Add(1)
+		go func(barkID string) {
+			defer wg.Done()
 
-func send(ctx context.Context, id, title, content string) error {
-	url := fmt.Sprintf(barkAPI, id, url.QueryEscape(title), url.QueryEscape(content))
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return fmt.Errorf("create request failed: %v", err)
-	}
+			// 构建URL
+			url := fmt.Sprintf(barkAPI, barkID, url.QueryEscape(title), url.QueryEscape(contentStr))
 
-	mu.RLock()
-	c := client
-	mu.RUnlock()
+			req := &HTTPRequest{
+				Method: "GET",
+				URL:    url,
+			}
 
-	if c == nil {
-		return fmt.Errorf("http client for bark not initialized")
+			if err := SendHTTPRequestWithRetry(ctx, req, MaxRetry); err != nil {
+				mu.Lock()
+				errors = append(errors, fmt.Errorf("bark device %s failed: %v", barkID, err))
+				mu.Unlock()
+			}
+		}(barkID)
 	}
 
-	resp, err := c.Do(req)
-	if err != nil {
-		return fmt.Errorf("send request failed: %v", err)
-	}
-	defer resp.Body.Close()
+	wg.Wait()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+	// 如果有任何错误，返回第一个错误
+	if len(errors) > 0 {
+		return errors[0]
 	}
 
 	return nil

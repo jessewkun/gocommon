@@ -48,6 +48,9 @@ func (t *DateTime) UnmarshalJSON(data []byte) error {
 		*t = DateTime(time.Time{})
 		return nil
 	}
+	if len(str) < 2 || str[0] != '"' || str[len(str)-1] != '"' {
+		return fmt.Errorf("invalid DateTime format, expected a quoted string")
+	}
 
 	// 去除引号
 	str = str[1 : len(str)-1]
@@ -60,13 +63,23 @@ func (t *DateTime) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// String 实现 Stringer 接口
 func (t DateTime) String() string {
 	return time.Time(t).Format("2006-01-02 15:04:05")
 }
 
+// Format 将字符串转换为 DateTime 类型
+func Format(datetime string) (DateTime, error) {
+	parsedTime, err := time.Parse("2006-01-02 15:04:05", datetime)
+	if err != nil {
+		return DateTime(time.Time{}), err
+	}
+	return DateTime(parsedTime), nil
+}
+
 // BaseModel 定义基础字段，方便所有业务模型继承
 type BaseModel struct {
-	ID         uint     `gorm:"primarykey" json:"id"`
+	ID         int      `gorm:"primarykey" json:"id"`
 	CreatedAt  DateTime `gorm:"type:datetime" json:"created_at"`
 	ModifiedAt DateTime `gorm:"type:datetime" json:"modified_at"`
 }

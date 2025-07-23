@@ -9,8 +9,6 @@ import (
 
 	"github.com/jessewkun/gocommon/utils"
 
-	"github.com/jessewkun/gocommon/alarm"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -71,7 +69,7 @@ func Init() error {
 	}
 
 	initSystemInfo()
-	logzap = zap.New(initCore(), zap.AddCallerSkip(1), zap.AddCaller())
+	logzap = zap.New(initCore(), zap.AddCallerSkip(2), zap.AddCaller())
 	return nil
 }
 
@@ -166,7 +164,7 @@ func log(c context.Context, entry LogEntry) {
 	}
 
 	// 发送报警
-	SendAlarm(c, string(entry.Level), entry.Tag, entry.Message)
+	SendAlarm(c, string(entry.Level), entry.Tag, entry.Message, entry.Error)
 }
 
 // Info 记录信息日志
@@ -186,6 +184,16 @@ func InfoWithField(c context.Context, tag string, msg string, fields map[string]
 		Message: msg,
 		Fields:  fields,
 	})
+}
+
+// InfoWithAlarm 记录带报警的信息日志
+func InfoWithAlarm(c context.Context, tag string, msg string, args ...interface{}) {
+	log(c, LogEntry{
+		Level:   InfoLevel,
+		Tag:     tag,
+		Message: fmt.Sprintf(msg, args...),
+	})
+	ForceSendAlarm(c, string(InfoLevel), tag, fmt.Sprintf(msg, args...), nil)
 }
 
 // Error 记录错误日志
@@ -235,6 +243,16 @@ func Warn(c context.Context, tag string, msg string, args ...interface{}) {
 	})
 }
 
+// WarnWithError 记录带错误信息的警告日志
+func WarnWithError(c context.Context, tag string, err error) {
+	log(c, LogEntry{
+		Level:   WarnLevel,
+		Tag:     tag,
+		Message: err.Error(),
+		Error:   err,
+	})
+}
+
 // WarnWithField 记录带字段的警告日志
 func WarnWithField(c context.Context, tag string, msg string, fields map[string]interface{}) {
 	log(c, LogEntry{
@@ -261,20 +279,4 @@ func Fatal(c context.Context, tag string, msg string, args ...interface{}) {
 		Tag:     tag,
 		Message: fmt.Sprintf(msg, args...),
 	})
-}
-
-func SendAlarm(c context.Context, level string, tag string, msg string) {
-	if Cfg.Closed {
-		return
-	}
-	canAlarm := false
-	for _, v := range alarmLevelMap[Cfg.AlarmLevel] {
-		if v == level {
-			canAlarm = true
-			break
-		}
-	}
-	if canAlarm {
-		_ = alarm.SendBark(c, "[ONLINE]Service Alarm", fmt.Sprintf("tag: %s\nmsg: %s", tag, msg))
-	}
 }

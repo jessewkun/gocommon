@@ -27,10 +27,10 @@ func TestMd5X(t *testing.T) {
 func TestAesCbc_Encode(t *testing.T) {
 	t.Run("TestAesCbc_Encode1", func(t *testing.T) {
 		ac := &AesCbc{
-			Key: "1234567890123456",
-			Iv:  "1234567890123456",
+			Key: "flby5t6iJEsShfpdVpMTnUNOEZXhvgDZ",
+			Iv:  "r14EWEMYO2144wK2",
 		}
-		got, err := ac.Encode("abc")
+		got, err := ac.Encode("wk")
 		if err != nil {
 			t.Errorf("AesCbc.Encode() error = %v, wantErr %v", err, nil)
 			return
@@ -41,8 +41,8 @@ func TestAesCbc_Encode(t *testing.T) {
 	})
 	t.Run("TestAesCbc_Encode2", func(t *testing.T) {
 		ac := &AesCbc{
-			Key: "1234567890123456",
-			Iv:  "1234567890123456",
+			Key: "flby5t6iJEsShfpdVpMTnUNOEZXhvgDZ",
+			Iv:  "r14EWEMYO2144wK2",
 		}
 		got, err := ac.Encode("abc")
 		if err != nil {

@@ -5,7 +5,7 @@ import (
 )
 
 // BindAndValidate 统一绑定和校验（自动判断来源类型）
-func BindAndValidate(ctx *gin.Context, obj interface{}) bool {
+func BindAndValidate(ctx *gin.Context, obj interface{}) error {
 	var err error
 
 	switch ctx.Request.Method {
@@ -17,9 +17,5 @@ func BindAndValidate(ctx *gin.Context, obj interface{}) bool {
 		err = ctx.ShouldBind(obj) // 支持 form-data 等
 	}
 
-	if err != nil {
-		ErrorResp(ctx, err)
-		return false
-	}
-	return true
+	return err
 }

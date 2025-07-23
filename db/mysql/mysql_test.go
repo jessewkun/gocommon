@@ -145,7 +145,7 @@ func TestGetConn_And_Close(t *testing.T) {
 
 	t.Run("close connections", func(t *testing.T) {
 		err := Close()
-		assert.NoError(t, err)
+		assert.Empty(t, err)
 		connList.mu.RLock()
 		assert.Empty(t, connList.conns)
 		connList.mu.RUnlock()

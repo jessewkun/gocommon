@@ -22,7 +22,7 @@
 
 ```go
 type BaseModel struct {
-    ID         uint     `gorm:"primarykey" json:"id"`
+    ID         int     `gorm:"primarykey" json:"id"`
     CreatedAt  DateTime `gorm:"type:datetime" json:"created_at"`
     ModifiedAt DateTime `gorm:"type:datetime" json:"modified_at"`
 }
@@ -100,9 +100,16 @@ type Config struct {
     ConnMaxLife               int      // 连接最长持续时间，默认1小时，单位秒
     SlowThreshold             int      // 慢查询阈值，单位毫秒，默认500毫秒
     IgnoreRecordNotFoundError bool     // 是否忽略记录未找到错误
-    IsLog                     bool     // 是否记录日志，日志级别为info
+    LogLevel                  string   // 日志级别：silent/error/warn/info，默认silent
 }
 ```
+
+### 日志级别说明
+
+-   `silent`: 不输出任何 SQL 日志（默认）
+-   `error`: 只输出错误日志
+-   `warn`: 输出警告和错误日志（包括慢查询）
+-   `info`: 输出所有 SQL 日志
 
 ### 配置示例
 
@@ -115,7 +122,7 @@ mysqlConfig := map[string]*Config{
         ConnMaxLife: 3600,
         SlowThreshold: 500,
         IgnoreRecordNotFoundError: true,
-        IsLog: true,
+        LogLevel: "info", // 输出所有SQL日志
     },
     "slave": {
         Dsn: []string{
@@ -128,8 +135,52 @@ mysqlConfig := map[string]*Config{
         ConnMaxLife: 3600,
         SlowThreshold: 1000,
         IgnoreRecordNotFoundError: true,
-        IsLog: true,
+        LogLevel: "warn", // 只输出慢查询和错误日志
     },
+}
+```
+
+### 不同环境的配置建议
+
+**开发环境**：
+
+```json
+{
+    "mysql": {
+        "default": {
+            "dsn": ["user:pass@tcp(localhost:3306)/dbname"],
+            "log_level": "info", // 输出所有SQL，便于调试
+            "slow_threshold": 500
+        }
+    }
+}
+```
+
+**测试环境**：
+
+```json
+{
+    "mysql": {
+        "default": {
+            "dsn": ["user:pass@tcp(localhost:3306)/dbname"],
+            "log_level": "warn", // 只关注慢查询和错误
+            "slow_threshold": 500
+        }
+    }
+}
+```
+
+**生产环境**：
+
+```json
+{
+    "mysql": {
+        "default": {
+            "dsn": ["user:pass@tcp(localhost:3306)/dbname"],
+            "log_level": "error", // 只关注错误，减少日志量
+            "slow_threshold": 500
+        }
+    }
 }
 ```
 
@@ -138,10 +189,10 @@ mysqlConfig := map[string]*Config{
 ### 1. 初始化连接
 
 ```go
-import "github.com/jessewkun/gocommon/db/mysql"
+import "github.com/ZhongMingEnergy/gocommon/db/mysql"
 
 // 初始化 MySQL 连接
-if err := mysql.InitMysql(mysqlConfig); err != nil {
+if err := mysql.Init(); err != nil {
     log.Fatalf("Failed to initialize MySQL: %v", err)
 }
 ```
@@ -199,7 +250,7 @@ for dbName, status := range healthStatus {
 
 ```go
 // 关闭连接
-if err := mysql.CloseMysql(); err != nil {
+if err := mysql.Close(); err != nil {
     log.Printf("Failed to close MySQL connections: %v", err)
 }
 ```
@@ -223,7 +274,7 @@ mysqlConfig := map[string]*Config{
         ConnMaxLife: 3600,
         SlowThreshold: 500,
         IgnoreRecordNotFoundError: true,
-        IsLog: true,
+        LogLevel: "warn", // 只输出慢查询和错误日志
     },
 }
 ```
@@ -249,7 +300,7 @@ mysqlConfig := map[string]*Config{
     "default": {
         Dsn:           []string{"user:password@tcp(localhost:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"},
         SlowThreshold: 1000, // 1秒以上的查询会被记录为慢查询
-        IsLog:         true, // 启用日志记录
+        LogLevel:      "warn", // 启用慢查询日志记录
     },
 }
 ```
@@ -277,6 +328,7 @@ mysqlConfig := map[string]*Config{
 3. **连接池大小**: 根据并发量和服务器资源调整连接池大小
 4. **事务使用**: 合理使用事务，确保数据一致性
 5. **索引创建**: 建议在查询字段上创建索引以提高性能
+6. **日志级别**: 根据环境需要合理配置日志级别，避免生产环境输出过多日志
 
 ## 示例代码
 

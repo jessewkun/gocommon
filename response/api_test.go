@@ -115,8 +115,11 @@ func TestBindAndValidate(t *testing.T) {
 		A int `form:"A" binding:"required"`
 	}
 	var req Req
-	ok := BindAndValidate(c, &req)
-	if !ok || req.A != 1 {
+	err := BindAndValidate(c, &req)
+	if err != nil {
+		t.Errorf("BindAndValidate GET 失败: %+v", err)
+	}
+	if req.A != 1 {
 		t.Errorf("BindAndValidate GET 失败: %+v", req)
 	}
 }

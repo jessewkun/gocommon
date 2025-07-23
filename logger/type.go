@@ -10,6 +10,10 @@ import (
 )
 
 // Config 日志配置
+// 高并发系统: 增大 MaxSize，减小 MaxAge，适当增加 MaxBackup
+// 低频率系统: 减小 MaxSize，增大 MaxAge，减少 MaxBackup
+// 磁盘空间紧张: 减小所有三个参数
+// 需要长期保留: 增大 MaxAge 和 MaxBackup
 type Config struct {
 	Path                 string   `mapstructure:"path" json:"path"`                                   // ⽇志⽂件路径
 	Closed               bool     `mapstructure:"closed" json:"closed"`                               // 是否关闭日志，注意该配置是全局配置，一旦关闭则所有日志都不会输出
@@ -52,8 +56,10 @@ func (c *Config) Validate() error {
 	}
 
 	// 验证报警级别
-	if _, ok := alarmLevelMap[c.AlarmLevel]; !ok {
-		return fmt.Errorf("invalid alarm level: %s", c.AlarmLevel)
+	if c.AlarmLevel != "" {
+		if _, ok := alarmLevelMap[c.AlarmLevel]; !ok {
+			return fmt.Errorf("invalid alarm level: %s", c.AlarmLevel)
+		}
 	}
 
 	return nil
@@ -69,14 +75,4 @@ func DefaultConfig() *Config {
 		TransparentParameter: []string{},
 		AlarmLevel:           "warn",
 	}
-}
-
-// 报警级别映射
-var alarmLevelMap = map[string][]string{
-	"debug": {"debug", "info", "warn", "error", "fatal", "panic"},
-	"info":  {"info", "warn", "error", "fatal", "panic"},
-	"warn":  {"warn", "error", "fatal", "panic"},
-	"error": {"error", "fatal", "panic"},
-	"fatal": {"fatal", "panic"},
-	"panic": {"panic"},
 }

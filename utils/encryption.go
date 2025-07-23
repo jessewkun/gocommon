@@ -16,15 +16,18 @@ type AesCbc struct {
 	Iv  string
 }
 
-// md5
+// Md5X 计算md5值
 func Md5X(str string) string {
 	h := md5.New()
 	h.Write([]byte(str))
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// cbc加密
+// Encode cbc加密
 func (ac *AesCbc) Encode(data string) (string, error) {
+	if data == "" {
+		return "", nil
+	}
 	_data := []byte(data)
 	_key := []byte(ac.Key)
 	_iv := []byte(ac.Iv)
@@ -39,8 +42,11 @@ func (ac *AesCbc) Encode(data string) (string, error) {
 	return base64.StdEncoding.EncodeToString(_data), nil
 }
 
-// cbc解密
+// Decode cbc解密
 func (ac *AesCbc) Decode(data string) (string, error) {
+	if data == "" {
+		return "", nil
+	}
 	_data, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
 		return "", err

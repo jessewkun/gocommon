@@ -1,137 +1,174 @@
 {
-  "mode": "debug",
-  "port": ":8000",
-  "domain": "http://localhost:8000",
-  "log": {
-    "path": "./logs/app.log",
-    "closed": false,
-    "max_size": 100,
-    "max_age": 30,
-    "max_backup": 10,
-    "transparent_parameter": ["trace_id", "user_id"],
-    "alarm_level": "warn"
-  },
-  "alarm": {
-    "bark_ids": ["your-bark-device-id"],
-    "timeout": 5
-  },
-  "http": {
-    "transparent_parameter": ["trace_id", "user_id"],
-    "is_log": true
-  },
-  "debug": {
-    "module": ["mysql", "http"],
-    "mode": "console"
-  },
-  "mysql": {
-    "default": {
-      "dsn": ["user:password@tcp(localhost:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"],
-      "max_conn": 100,
-      "max_idle_conn": 25,
-      "conn_max_life": 3600,
-      "slow_threshold": 500,
-      "ignore_record_not_found_error": true,
-      "is_log": true
+    "mode": "debug",
+    "port": ":8000",
+    "domain": "http://localhost:8000",
+    "log": {
+        "path": "./logs/app.log",
+        "closed": false,
+        "max_size": 100,
+        "max_age": 30,
+        "max_backup": 10,
+        "transparent_parameter": [
+            "trace_id",
+            "user_id"
+        ],
+        "alarm_level": "warn"
     },
-    "slave": {
-      "dsn": [
-        "user:password@tcp(master:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local",
-        "user:password@tcp(slave1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
-      ],
-      "max_conn": 50,
-      "max_idle_conn": 10,
-      "conn_max_life": 3600,
-      "slow_threshold": 1000,
-      "ignore_record_not_found_error": true,
-      "is_log": true
-    }
-  },
-  "redis": {
-    "default": {
-      "addrs": ["localhost:6379"],
-      "password": "",
-      "db": 0,
-      "is_log": true,
-      "pool_size": 100,
-      "idle_timeout": 300,
-      "idle_check_frequency": 60,
-      "min_idle_conns": 10,
-      "max_retries": 3,
-      "dial_timeout": 5,
-      "slow_threshold": 100
+    "alarm": {
+        "timeout": 5,
+        "bark": {
+            "bark_ids": [
+                ""
+            ]
+        },
+        "feishu": {
+            "webhook_url": "",
+            "secret": ""
+        }
     },
-    "cluster": {
-      "addrs": ["localhost:7000", "localhost:7001", "localhost:7002"],
-      "password": "",
-      "db": 0,
-      "is_log": true,
-      "pool_size": 50,
-      "idle_timeout": 300,
-      "idle_check_frequency": 60,
-      "min_idle_conns": 5,
-      "max_retries": 3,
-      "dial_timeout": 5,
-      "slow_threshold": 100
-    }
-  },
-  "mongodb": {
-    "default": {
-      "uris": ["mongodb://localhost:27017"],
-      "max_pool_size": 100,
-      "min_pool_size": 5,
-      "max_conn_idle_time": 300,
-      "connect_timeout": 10,
-      "server_selection_timeout": 5,
-      "socket_timeout": 30,
-      "read_preference": "primary",
-      "write_concern": "majority",
-      "is_log": true,
-      "slow_threshold": 500
+    "http": {
+        "transparent_parameter": [
+            "trace_id",
+            "user_id"
+        ],
+        "is_log": true
     },
-    "replica": {
-      "uris": ["mongodb://localhost:27017", "mongodb://localhost:27018", "mongodb://localhost:27019"],
-      "max_pool_size": 50,
-      "min_pool_size": 3,
-      "max_conn_idle_time": 300,
-      "connect_timeout": 10,
-      "server_selection_timeout": 5,
-      "socket_timeout": 30,
-      "read_preference": "secondaryPreferred",
-      "write_concern": "majority",
-      "is_log": true,
-      "slow_threshold": 1000
-    }
-  },
-  "elasticsearch": {
-    "default": {
-      "addresses": ["http://localhost:9200"],
-      "username": "",
-      "password": ""
+    "debug": {
+        "module": [
+            "mysql",
+            "http"
+        ],
+        "mode": "console"
     },
-    "cluster": {
-      "addresses": ["http://localhost:9200", "http://localhost:9201", "http://localhost:9202"],
-      "username": "elastic",
-      "password": "password"
-    }
-  },
-  "nacos": {
-    "default": {
-      "host": "localhost",
-      "port": 8848,
-      "namespace": "public",
-      "group": "DEFAULT_GROUP",
-      "username": "",
-      "password": "",
-      "timeout": 5000
+    "mysql": {
+        "default": {
+            "dsn": [
+                "user:password@tcp(localhost:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
+            ],
+            "max_conn": 100,
+            "max_idle_conn": 25,
+            "conn_max_life": 3600,
+            "slow_threshold": 500,
+            "ignore_record_not_found_error": true,
+            "log_level": "info"
+        },
+        "slave": {
+            "dsn": [
+                "user:password@tcp(master:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local",
+                "user:password@tcp(slave1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
+            ],
+            "max_conn": 50,
+            "max_idle_conn": 10,
+            "conn_max_life": 3600,
+            "slow_threshold": 1000,
+            "ignore_record_not_found_error": true,
+            "log_level": "info"
+        }
     },
-    "production": {
-      "host": "nacos.example.com",
-      "port": 8848,
-      "namespace": "production",
-      "group": "DEFAULT_GROUP",
-      "username": "nacos",
-      "password": "nacos",
-      "timeout": 10000
+    "redis": {
+        "default": {
+            "addrs": [
+                "localhost:6379"
+            ],
+            "password": "",
+            "db": 0,
+            "is_log": true,
+            "pool_size": 100,
+            "idle_timeout": 300,
+            "idle_check_frequency": 60,
+            "min_idle_conns": 10,
+            "max_retries": 3,
+            "dial_timeout": 5,
+            "slow_threshold": 100
+        },
+        "cluster": {
+            "addrs": [
+                "localhost:7000",
+                "localhost:7001",
+                "localhost:7002"
+            ],
+            "password": "",
+            "db": 0,
+            "is_log": true,
+            "pool_size": 50,
+            "idle_timeout": 300,
+            "idle_check_frequency": 60,
+            "min_idle_conns": 5,
+            "max_retries": 3,
+            "dial_timeout": 5,
+            "slow_threshold": 100
+        }
+    },
+    "mongodb": {
+        "default": {
+            "uris": [
+                "mongodb://localhost:27017"
+            ],
+            "max_pool_size": 100,
+            "min_pool_size": 5,
+            "max_conn_idle_time": 300,
+            "connect_timeout": 10,
+            "server_selection_timeout": 5,
+            "socket_timeout": 30,
+            "read_preference": "primary",
+            "write_concern": "majority",
+            "is_log": true,
+            "slow_threshold": 500
+        },
+        "replica": {
+            "uris": [
+                "mongodb://localhost:27017",
+                "mongodb://localhost:27018",
+                "mongodb://localhost:27019"
+            ],
+            "max_pool_size": 50,
+            "min_pool_size": 3,
+            "max_conn_idle_time": 300,
+            "connect_timeout": 10,
+            "server_selection_timeout": 5,
+            "socket_timeout": 30,
+            "read_preference": "secondaryPreferred",
+            "write_concern": "majority",
+            "is_log": true,
+            "slow_threshold": 1000
+        }
+    },
+    "elasticsearch": {
+        "default": {
+            "addresses": [
+                "http://localhost:9200"
+            ],
+            "username": "",
+            "password": ""
+        },
+        "cluster": {
+            "addresses": [
+                "http://localhost:9200",
+                "http://localhost:9201",
+                "http://localhost:9202"
+            ],
+            "username": "elastic",
+            "password": "password"
+        }
+    },
+    "nacos": {
+        "default": {
+            "host": "localhost",
+            "port": 8848,
+            "namespace": "public",
+            "group": "DEFAULT_GROUP",
+            "username": "",
+            "password": "",
+            "timeout": 5000
+        },
+        "production": {
+            "host": "nacos.example.com",
+            "port": 8848,
+            "namespace": "production",
+            "group": "DEFAULT_GROUP",
+            "username": "nacos",
+            "password": "nacos",
+            "timeout": 10000
+        }
     }
-  }
 }

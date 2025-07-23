@@ -42,7 +42,7 @@ func ExampleMysqlUsage() {
 			ConnMaxLife:               3600,
 			SlowThreshold:             500,
 			IgnoreRecordNotFoundError: true,
-			IsLog:                     true,
+			LogLevel:                  "info",
 		},
 		"slave": {
 			Dsn: []string{
@@ -55,7 +55,7 @@ func ExampleMysqlUsage() {
 			ConnMaxLife:               3600,
 			SlowThreshold:             1000,
 			IgnoreRecordNotFoundError: true,
-			IsLog:                     true,
+			LogLevel:                  "info",
 		},
 	}
 

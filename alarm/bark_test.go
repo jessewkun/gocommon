@@ -8,7 +8,9 @@ import (
 func TestSendBark(t *testing.T) {
 	originalCfg := Cfg
 	Cfg = &Config{
-		BarkIds: []string{"jT64URJj8b6Fp9Y3nVKJiP"},
+		Bark: &Bark{
+			BarkIds: []string{"jT64URJj8b6Fp9Y3nVKJiP"},
+		},
 		Timeout: 5,
 	}
 	if err := Init(); err != nil {
@@ -24,7 +26,7 @@ func TestSendBark(t *testing.T) {
 	type args struct {
 		ctx     context.Context
 		title   string
-		content string
+		content []string
 	}
 	tests := []struct {
 		name string
@@ -35,14 +37,14 @@ func TestSendBark(t *testing.T) {
 			args: args{
 				ctx:     context.Background(),
 				title:   "Go Test Alarm",
-				content: "This is a test message from a unit test.",
+				content: []string{"This is a test message from a unit test."},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := SendBark(tt.args.ctx, tt.args.title, tt.args.content); err != nil {
-				t.Errorf("SendBark() error = %v, wantErr %v", err, false)
+			if err := Cfg.Bark.Send(tt.args.ctx, tt.args.title, tt.args.content); err != nil {
+				t.Errorf("Bark.Send() error = %v, wantErr %v", err, false)
 			}
 		})
 	}
