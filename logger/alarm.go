@@ -68,11 +68,11 @@ func buildAlarmContent(c context.Context, tag string, msg string, err error) []s
 	content = append(content, fmt.Sprintf("【TAG】: %s", tag))
 
 	if msg != "" {
-		content = append(content, fmt.Sprintf("【ERROR MESSAGE】: %s", msg))
+		content = append(content, fmt.Sprintf("【MESSAGE】: %s", msg))
 	}
 
 	if err != nil {
-		content = append(content, fmt.Sprintf("【ERROR DETAIL】: %v", err))
+		content = append(content, fmt.Sprintf("【ERROR】: %v", err))
 	}
 
 	if stackInfo := getCallStackInfo(); stackInfo != "" {

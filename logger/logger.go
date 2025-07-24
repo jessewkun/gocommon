@@ -201,7 +201,7 @@ func Error(c context.Context, tag string, err error) {
 	log(c, LogEntry{
 		Level:   ErrorLevel,
 		Tag:     tag,
-		Message: err.Error(),
+		Message: "",
 		Error:   err,
 	})
 }
@@ -248,7 +248,7 @@ func WarnWithError(c context.Context, tag string, err error) {
 	log(c, LogEntry{
 		Level:   WarnLevel,
 		Tag:     tag,
-		Message: err.Error(),
+		Message: "",
 		Error:   err,
 	})
 }
