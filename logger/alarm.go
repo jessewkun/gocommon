@@ -79,6 +79,10 @@ func buildAlarmContent(c context.Context, tag string, msg string, err error) []s
 		content = append(content, fmt.Sprintf("【CALL STACK】: %s", stackInfo))
 	}
 
+	if requestPath := c.Value(constant.CtxCurrentRequestPath); requestPath != nil {
+		content = append(content, fmt.Sprintf("【REQUEST PATH】: %v", requestPath))
+	}
+
 	if userID := c.Value(constant.CtxUserID); userID != nil {
 		content = append(content, fmt.Sprintf("【USER ID】: %v", userID))
 	}
