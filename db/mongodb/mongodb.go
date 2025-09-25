@@ -1,3 +1,4 @@
+// Package mongodb 提供 MongoDB 连接管理功能
 package mongodb
 
 import (

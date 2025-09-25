@@ -7,17 +7,13 @@ import (
 	"math/rand/v2"
 )
 
-// RandomNum
-//
-// 返回指定范围的随机数
+// RandomNum 返回指定范围的随机数
 func RandomNum(min int, max int) int {
 	r := rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0))
 	return r.IntN(max-min+1) + min
 }
 
-// RandomElement
-//
-// 返回 map 中的随机元素
+// RandomElement 返回 map 中的随机元素
 func RandomElement(m map[string]interface{}) (string, interface{}) {
 	keys := make([]string, 0, len(m))
 	for key := range m {
@@ -31,9 +27,7 @@ func RandomElement(m map[string]interface{}) (string, interface{}) {
 // 定义字符集
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-// RandomString
-//
-// 返回指定长度的随机字符串
+// RandomString 返回指定长度的随机字符串，包含大小写字母和数字
 func RandomString(n int) string {
 	r := rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0))
 	b := make([]byte, n)
@@ -43,9 +37,7 @@ func RandomString(n int) string {
 	return string(b)
 }
 
-// RandomCode
-//
-// 返回指定长度的随机数字
+// RandomCode 返回指定长度的随机数字
 func RandomCode(n int) string {
 	const digits = "0123456789"
 	var sb strings.Builder

@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"errors"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -190,7 +189,7 @@ func handleError(c *gin.Context, errMsg string) {
 	if jwtConfig.ErrorHandler != nil {
 		jwtConfig.ErrorHandler(c, errors.New(errMsg))
 	} else {
-		c.JSON(http.StatusUnauthorized, response.ErrorResp(c, errors.New(errMsg)))
+		response.Error(c, errors.New(errMsg))
 	}
 	c.Abort()
 }

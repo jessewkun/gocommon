@@ -25,6 +25,14 @@ func (ce CustomError) Unwrap() error {
 	return ce.Err
 }
 
+// Is 实现 errors.Is 接口
+func (ce CustomError) Is(target error) bool {
+	if targetCustomErr, ok := target.(CustomError); ok {
+		return ce.Code == targetCustomErr.Code
+	}
+	return false
+}
+
 // NewCustomError 创建自定义错误
 // 业务自定义错误码必须大于10000，小于10000的错误码为系统错误码，10000为默认业务错误码
 func NewCustomError(code int, err error) CustomError {

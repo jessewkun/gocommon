@@ -1,3 +1,4 @@
+// Package mysql 提供 MySQL 数据库连接管理功能
 package mysql
 
 import (

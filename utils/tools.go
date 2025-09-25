@@ -1,3 +1,4 @@
+// Package utils 提供一些常用的工具函数
 package utils
 
 import (
@@ -28,4 +29,45 @@ func MaskPhoneNumber(phone string) string {
 		}
 		return phone[:3] + strings.Repeat("*", length-7) + phone[length-4:]
 	}
+}
+
+// MaskCustome 自定义脱敏
+// 规则：
+// 1. 根据起始位置和结束位置，用*代替中间的字符
+// 2. 起始位置不能为负数
+// 3. 如果end为-1，则从start开始全部替换
+// 4. 如果end不为-1，则起始位置不能大于结束位置，且结束位置不能大于字符串长度
+// 5. 空字符串或非法字符返回空字符串
+// 6. 支持中文字符，按字符位置而非字节位置处理
+func MaskCustome(str string, start int, end int) string {
+	if start < 0 {
+		return ""
+	}
+
+	// 将字符串转换为rune切片，以正确处理中文字符
+	runes := []rune(str)
+
+	// 如果end为-1，则从start开始全部替换
+	if end == -1 {
+		if start >= len(runes) {
+			return ""
+		}
+		var result strings.Builder
+		result.WriteString(string(runes[:start]))
+		result.WriteString(strings.Repeat("*", len(runes)-start))
+		return result.String()
+	}
+
+	// 正常的end参数处理
+	if end < 0 || start > end || end > len(runes) {
+		return ""
+	}
+
+	// 构建结果字符串，用对应数量的星号替换
+	var result strings.Builder
+	result.WriteString(string(runes[:start]))
+	result.WriteString(strings.Repeat("*", end-start))
+	result.WriteString(string(runes[end:]))
+
+	return result.String()
 }

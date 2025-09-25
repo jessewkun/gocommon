@@ -1,3 +1,4 @@
+// Package http 提供 HTTP 客户端功能
 package http
 
 import (

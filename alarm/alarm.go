@@ -19,7 +19,7 @@ func SendAlarm(ctx context.Context, title string, content []string) error {
 	var errors []error
 
 	// 发送到 Bark 渠道
-	if Cfg.Bark != nil {
+	if len(Cfg.Bark.BarkIds) > 0 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -33,7 +33,7 @@ func SendAlarm(ctx context.Context, title string, content []string) error {
 	}
 
 	// 发送到 Feishu 渠道
-	if Cfg.Feishu != nil {
+	if len(Cfg.Feishu.WebhookURL) > 0 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"net/http"
 	"sync"
 	"time"
 
@@ -94,7 +93,7 @@ func RateLimiter(cfg *RateLimiterConfig) gin.HandlerFunc {
 	// 添加配置验证日志
 	if cfg.EnableLog {
 		if cfg.GlobalLimiter == nil {
-			logger.Warn(context.Background(), "RATE_LIMITER", "GlobalLimiter is nil, global rate limiting is disabled")
+			logger.Info(context.Background(), "RATE_LIMITER", "GlobalLimiter is nil, global rate limiting is disabled")
 		} else {
 			logger.Info(context.Background(), "RATE_LIMITER", "Rate limiter initialized with global limiter")
 		}
@@ -126,7 +125,7 @@ func RateLimiter(cfg *RateLimiterConfig) gin.HandlerFunc {
 				if cfg.EnableLog {
 					logger.Warn(c.Request.Context(), "RATE_LIMITER", "Global rate limit exceeded, url: %s", c.Request.URL.Path)
 				}
-				c.JSON(http.StatusOK, response.RateLimiterErrorResp(c))
+				response.RateLimiterError(c)
 				c.Abort()
 				return
 			}
@@ -139,7 +138,7 @@ func RateLimiter(cfg *RateLimiterConfig) gin.HandlerFunc {
 				if cfg.EnableLog {
 					logger.Warn(c.Request.Context(), "RATE_LIMITER", "IP rate limit exceeded: %s, url: %s", clientIP, c.Request.URL.Path)
 				}
-				c.JSON(http.StatusOK, response.RateLimiterErrorResp(c))
+				response.RateLimiterError(c)
 				c.Abort()
 				return
 			}

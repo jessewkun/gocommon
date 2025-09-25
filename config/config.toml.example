@@ -1,6 +1,7 @@
 # 基础配置
 mode = "debug"
 port = ":8000"
+app_name = "service"
 domain = "http://localhost:8000"
 
 # 日志配置

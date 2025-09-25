@@ -1,3 +1,4 @@
+// Package logger 提供日志记录功能
 package logger
 
 import (

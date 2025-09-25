@@ -1,3 +1,4 @@
+// Package nacos 提供 Nacos 连接管理功能
 package nacos
 
 import (

@@ -9,8 +9,10 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 )
 
+// AesCbc 提供aes-cbc加密解密功能
 type AesCbc struct {
 	Key string
 	Iv  string
@@ -60,23 +62,70 @@ func (ac *AesCbc) Decode(data string) (string, error) {
 	}
 	mode := cipher.NewCBCDecrypter(block, _iv)
 	mode.CryptBlocks(_data, _data)
-	_data = ac.pKCS7UnPadding(_data)
+	_data, err = ac.pKCS7UnPadding(_data)
+	if err != nil {
+		return "", err
+	}
 
 	return string(_data), nil
 }
 
+// SafeEncode 安全加密包装函数，防止panic
+func (ac *AesCbc) SafeEncode(data string) (string, error) {
+	var result string
+	var encodeErr error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				encodeErr = errors.New("加密过程发生panic")
+			}
+		}()
+		result, encodeErr = ac.Encode(data)
+	}()
+	return result, encodeErr
+}
+
+// SafeDecode 安全加密包装函数，防止panic
+func (ac *AesCbc) SafeDecode(data string) (string, error) {
+	var result string
+	var decodeErr error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				decodeErr = errors.New("解密过程发生panic")
+			}
+		}()
+		result, decodeErr = ac.Decode(data)
+	}()
+	return result, decodeErr
+}
+
+// pKCS7Padding 添加PKCS7填充
 func (ac *AesCbc) pKCS7Padding(data []byte) []byte {
 	padding := aes.BlockSize - len(data)%aes.BlockSize
 	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
 	return append(data, padtext...)
 }
 
-func (ac *AesCbc) pKCS7UnPadding(data []byte) []byte {
+// pKCS7UnPadding 移除PKCS7填充
+func (ac *AesCbc) pKCS7UnPadding(data []byte) ([]byte, error) {
 	length := len(data)
+	if length == 0 {
+		return data, errors.New("数据为空")
+	}
 	unpadding := int(data[length-1])
-	return data[:(length - unpadding)]
+	if unpadding == 0 || unpadding > aes.BlockSize || unpadding > length {
+		return data, errors.New("padding值非法")
+	}
+	for i := length - unpadding; i < length; i++ {
+		if data[i] != byte(unpadding) {
+			return data, errors.New("padding内容非法")
+		}
+	}
+	return data[:(length - unpadding)], nil
 }
 
+// HMACSHA1 计算HMAC-SHA1值
 func HMACSHA1(message, key string) []byte {
 	// 将密钥转换为字节数组
 	keyBytes := []byte(key)

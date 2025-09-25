@@ -1,3 +1,4 @@
+// Package debug 提供调试日志输出功能
 package debug
 
 import (

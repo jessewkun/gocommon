@@ -48,14 +48,14 @@ func SendAlarm(c context.Context, level string, tag string, msg string, err erro
 
 	if canAlarm {
 		content := buildAlarmContent(c, tag, msg, err)
-		_ = alarm.SendAlarm(c, "["+config.Cfg.Mode+"] Service Alarm - "+level, content)
+		_ = alarm.SendAlarm(c, "["+config.Cfg.Mode+"] "+config.Cfg.AppName+" Alarm - "+level, content)
 	}
 }
 
 // ForceSendAlarm 强制发送报警
 func ForceSendAlarm(c context.Context, level string, tag string, msg string, err error) {
 	content := buildAlarmContent(c, tag, msg, err)
-	_ = alarm.SendAlarm(c, "["+config.Cfg.Mode+"] Service Alarm - "+level, content)
+	_ = alarm.SendAlarm(c, "["+config.Cfg.Mode+"] "+config.Cfg.AppName+" Alarm - "+level, content)
 }
 
 // buildAlarmContent 构建报警内容

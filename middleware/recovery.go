@@ -3,7 +3,6 @@ package middleware
 import (
 	"bytes"
 	"fmt"
-	"net/http"
 	"runtime"
 
 	"github.com/jessewkun/gocommon/common"
@@ -26,7 +25,7 @@ func Recovery() gin.HandlerFunc {
 					fmt.Printf("recover: %+v\n", r)
 					fmt.Printf("panic: %+v\n", string(trace))
 				}
-				c.JSON(http.StatusOK, response.SystemErrorResp(c))
+				response.SystemError(c)
 				c.Abort()
 			}
 		}()

@@ -1,3 +1,4 @@
+// Package redis 提供 Redis 连接管理功能
 package redis
 
 import (

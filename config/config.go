@@ -42,16 +42,18 @@ func RegisterCallback(key string, fn func() error) {
 
 // BaseConfig 基础配置
 type BaseConfig struct {
-	Mode   string `mapstructure:"mode" json:"mode"`     // 运行模式, debug 开发, release 生产, test 测试
-	Port   string `mapstructure:"port" json:"port"`     // 服务端口, 默认 :8000
-	Domain string `mapstructure:"domain" json:"domain"` // 服务域名, 默认 http://localhost:8000
+	Mode    string `mapstructure:"mode" json:"mode"`         // 运行模式, debug 开发, release 生产, test 测试
+	Port    string `mapstructure:"port" json:"port"`         // 服务端口, 默认 :8000
+	AppName string `mapstructure:"app_name" json:"app_name"` // 服务标题, 默认 "Service"
+	Domain  string `mapstructure:"domain" json:"domain"`     // 服务域名, 默认 http://localhost:8000
 }
 
 // Cfg is the global instance for base configuration.
 var Cfg = &BaseConfig{
-	Mode:   "debug",
-	Port:   ":8000",
-	Domain: "http://localhost:8000",
+	Mode:    "debug",
+	Port:    ":8000",
+	AppName: "Service",
+	Domain:  "http://localhost:8000",
 }
 
 // Init 初始化配置，从给定路径加载配置，填充基础配置 (Cfg)，并填充所有注册的模块配置

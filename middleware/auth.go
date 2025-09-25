@@ -1,8 +1,7 @@
+// Package middleware 提供中间件功能
 package middleware
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"github.com/jessewkun/gocommon/common"
 	"github.com/jessewkun/gocommon/response"
@@ -23,7 +22,7 @@ type NeedLoginFunc func(c *gin.Context)
 func CheckLogin(fun CheckLoginFunc) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if err := fun(c); err != nil {
-			c.JSON(http.StatusOK, response.ErrorResp(c, common.NewCustomError(10001, err)))
+			response.Error(c, common.NewCustomError(10001, err))
 			c.Abort()
 			return
 		}

@@ -1,3 +1,4 @@
+// Package elasticsearch 提供 Elasticsearch 连接管理功能
 package elasticsearch
 
 import (

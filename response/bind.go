@@ -4,7 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// BindAndValidate 统一绑定和校验（自动判断来源类型）
+// BindAndValidate 统一绑定和校验（自动判断来源类型），返回 error 由业务层处理
 func BindAndValidate(ctx *gin.Context, obj interface{}) error {
 	var err error
 

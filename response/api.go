@@ -1,7 +1,10 @@
+// Package response 提供API返回结果的封装
 package response
 
 import (
+	"encoding/json"
 	"errors"
+	"net/http"
 
 	"github.com/jessewkun/gocommon/common"
 	"github.com/jessewkun/gocommon/constant"
@@ -23,49 +26,93 @@ func NewAPIResult(c *gin.Context, code int, message string, data interface{}) *A
 	return resp
 }
 
-// SuccessResp success response
-func SuccessResp(c *gin.Context, data interface{}) *APIResult {
+// NewAPIResultWs 创建一个不设置返回结果的APIResult
+// 目前的方式会导致 websocket 请求在连接中断的时候才记录日志，并且日志量巨大，所以就不记录返回值了
+// 注意 iolog 还是会记录，只是没有 response
+func NewAPIResultWs(c *gin.Context, code int, message string, data interface{}) *APIResult {
+	resp := &APIResult{
+		Code:    code,
+		Message: message,
+		Data:    data,
+		TraceID: c.GetString(string(constant.CtxTraceID)),
+	}
+
+	return resp
+}
+
+// Success success response
+func Success(c *gin.Context, data interface{}) {
 	if data == nil {
 		data = struct{}{}
 	}
-	return NewAPIResult(c, CodeSuccess, "success", data)
+	c.JSON(http.StatusOK, NewAPIResult(c, CodeSuccess, "success", data))
 }
 
-// ErrorResp error response
-func ErrorResp(c *gin.Context, err error) *APIResult {
-	if !errors.As(err, &common.CustomError{}) {
+// SuccessWs success response for websocket
+func SuccessWs(c *gin.Context, data interface{}) ([]byte, error) {
+	if data == nil {
+		data = struct{}{}
+	}
+	return json.Marshal(NewAPIResultWs(c, CodeSuccess, "success", data))
+}
+
+// Error error response
+func Error(c *gin.Context, err error) {
+	var customErr common.CustomError
+	if !errors.As(err, &customErr) {
 		err = newDefaultError(err)
+	} else {
+		c.JSON(http.StatusOK, NewAPIResult(c, customErr.Code, customErr.Error(), struct{}{}))
+		return
+	}
+
+	e := err.(common.CustomError)
+	c.JSON(http.StatusOK, NewAPIResult(c, e.Code, e.Error(), struct{}{}))
+}
+
+// ErrorWs error response for websocket
+func ErrorWs(c *gin.Context, err error) ([]byte, error) {
+	var customErr common.CustomError
+	if !errors.As(err, &customErr) {
+		err = newDefaultError(err)
+	} else {
+		return json.Marshal(NewAPIResultWs(c, customErr.Code, customErr.Error(), struct{}{}))
 	}
 	e := err.(common.CustomError)
-	return NewAPIResult(c, e.Code, e.Error(), struct{}{})
+	return json.Marshal(NewAPIResultWs(c, e.Code, e.Error(), struct{}{}))
 }
 
-// CustomResp 自定义返回
-func CustomResp(ctx *gin.Context, code int, message string, data interface{}) *APIResult {
-	return NewAPIResult(ctx, code, message, data)
+// Custom 自定义返回
+func Custom(c *gin.Context, code int, message string, data interface{}) {
+	c.JSON(http.StatusOK, NewAPIResult(c, code, message, data))
 }
 
-// SystemErrorResp system error response
-func SystemErrorResp(c *gin.Context) *APIResult {
-	return ErrorResp(c, SystemError)
+// SystemError system error response
+func SystemError(c *gin.Context) {
+	Error(c, SystemErrors)
 }
 
-// ParamErrorResp param error response
-func ParamErrorResp(c *gin.Context) *APIResult {
-	return ErrorResp(c, ParamError)
+// ParamError param error response
+func ParamError(c *gin.Context) {
+	Error(c, ParamErrors)
 }
 
-// ForbiddenErrorResp forbidden error response
-func ForbiddenErrorResp(c *gin.Context) *APIResult {
-	return ErrorResp(c, ForbiddenError)
+// ForbiddenError forbidden error response
+func ForbiddenError(c *gin.Context) {
+	Error(c, ForbiddenErrors)
 }
 
-// NotfoundErrorResp not found error response
-func NotfoundErrorResp(c *gin.Context) *APIResult {
-	return ErrorResp(c, NotfoundError)
+// NotfoundError not found error response
+func NotfoundError(c *gin.Context) {
+	Error(c, NotfoundErrors)
 }
 
-// RateLimiterErrorResp rate limiter error response
-func RateLimiterErrorResp(c *gin.Context) *APIResult {
-	return ErrorResp(c, RateLimiterError)
+// RateLimiterError rate limiter error response
+func RateLimiterError(c *gin.Context) {
+	Error(c, RateLimiterErrors)
+}
+
+// UnknownError unknown error response
+func UnknownError(c *gin.Context) {
+	Error(c, UnknownErrors)
 }

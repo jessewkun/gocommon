@@ -1,3 +1,4 @@
+// Package localcache 提供本地缓存功能
 package localcache
 
 import (

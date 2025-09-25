@@ -3,6 +3,7 @@ module github.com/jessewkun/gocommon
 go 1.23.10
 
 require (
+	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
 	github.com/allegro/bigcache v1.2.1
 	github.com/elastic/go-elasticsearch/v8 v8.18.1
 	github.com/fsnotify/fsnotify v1.8.0
@@ -14,6 +15,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/nacos-group/nacos-sdk-go/v2 v2.3.2
 	github.com/prometheus/client_golang v1.12.2
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
