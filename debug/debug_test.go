@@ -3,109 +3,82 @@ package debug
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
-	"strings"
-	"sync"
 	"testing"
 
-	"github.com/jessewkun/gocommon/logger"
+	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 )
 
-// debugTestMutex ensures that tests modifying the global Cfg are run serially.
-var debugTestMutex sync.Mutex
+// setup a helper to temporarily redirect stdout
+func captureStdout(f func()) string {
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	f()
+
+	w.Close()
+	os.Stdout = old
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	return buf.String()
+}
 
 func TestIsDebug(t *testing.T) {
-	debugTestMutex.Lock()
-	defer debugTestMutex.Unlock()
+	// Clean up global state after test
+	originalConfig := defaultDebugger.Config
+	originalModules := defaultDebugger.enabledModules
+	defer func() {
+		defaultDebugger.mu.Lock()
+		defaultDebugger.Config = originalConfig
+		defaultDebugger.enabledModules = originalModules
+		defaultDebugger.mu.Unlock()
+	}()
 
-	originalModule := Cfg.Module
-	t.Cleanup(func() { Cfg.Module = originalModule })
+	// Simulate loading a config
+	v := viper.New()
+	v.Set("debug.module", []string{"mod1", "mod2"})
+	v.Set("debug.mode", "console")
+	if err := defaultDebugger.Reload(v); err != nil {
+		t.Fatalf("failed to reload debug config: %v", err)
+	}
 
-	Cfg.Module = []string{"mod1", "mod2"}
-	if !IsDebug("mod1") {
-		t.Error("mod1 应该被识别为 debug")
-	}
-	if IsDebug("mod3") {
-		t.Error("mod3 不应该被识别为 debug")
-	}
+	assert.True(t, IsDebug("mod1"), "mod1 should be enabled for debug")
+	assert.True(t, IsDebug("mod2"), "mod2 should be enabled for debug")
+	assert.False(t, IsDebug("mod3"), "mod3 should not be enabled for debug")
 }
 
-func TestInitDebug(t *testing.T) {
-	debugTestMutex.Lock()
-	defer debugTestMutex.Unlock()
+func TestLog_ConsoleMode(t *testing.T) {
+	// Clean up global state after test
+	originalConfig := defaultDebugger.Config
+	originalModules := defaultDebugger.enabledModules
+	defer func() {
+		defaultDebugger.mu.Lock()
+		defaultDebugger.Config = originalConfig
+		defaultDebugger.enabledModules = originalModules
+		defaultDebugger.mu.Unlock()
+	}()
 
-	originalModule := Cfg.Module
-	t.Cleanup(func() { Cfg.Module = originalModule })
-
-	Cfg.Module = []string{"modx"}
-	// hookPrint 只会在 IsDebug 返回 true 时调用
-	f := InitDebug("modx")
-	// 重定向 os.Stdout 捕获输出
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	f(context.Background(), "hello %s", []interface{}{"world"}...)
-	w.Close()
-	os.Stdout = old
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
-	output := buf.String()
-	if !strings.Contains(output, "hello world") {
-		t.Errorf("InitDebug 未输出预期内容, got: %s", output)
+	// Simulate loading config for console mode
+	v := viper.New()
+	v.Set("debug.module", []string{"test_console"})
+	v.Set("debug.mode", "console")
+	if err := defaultDebugger.Reload(v); err != nil {
+		t.Fatalf("failed to reload debug config: %v", err)
 	}
-}
 
-func TestHookPrint_ModeLog(t *testing.T) {
-	debugTestMutex.Lock()
-	defer debugTestMutex.Unlock()
-
-	originalMode := Cfg.Mode
-	t.Cleanup(func() { Cfg.Mode = originalMode })
-
-	Cfg.Mode = "log"
-	// 为了测试日志输出，我们需要临时初始化logger
-	// 注意：这可能会与其他测试（如http_test）冲突，因此锁是必要的
-	originalLogCfg := logger.Cfg
-	logger.Cfg.Path = "./test.log"
-	logger.Cfg.Closed = false
-	if err := logger.Init(); err != nil {
-		t.Fatalf("logger.InitLogger() failed: %v", err)
-	}
-	t.Cleanup(func() {
-		logger.Cfg = originalLogCfg
-		logger.Init()
-		os.Remove("./test.log")
+	// Case 1: Debug module is enabled
+	output := captureStdout(func() {
+		Log(context.Background(), "test_console", "hello %s", "world")
 	})
+	assert.Contains(t, output, "[DEBUG_test_console]", "Output should contain correct tag")
+	assert.Contains(t, output, "hello world", "Output should contain the formatted message")
 
-	hookPrint(context.Background(), "log模式: %d", 123)
-	// 检查日志文件是否包含内容
-	content, err := os.ReadFile("./test.log")
-	if err != nil {
-		t.Fatalf("Could not read log file: %v", err)
-	}
-	if !strings.Contains(string(content), "log模式: 123") {
-		t.Errorf("log file should contain the message, but got: %s", string(content))
-	}
-}
-
-func TestHookPrint_ModeStdout(t *testing.T) {
-	debugTestMutex.Lock()
-	defer debugTestMutex.Unlock()
-
-	originalMode := Cfg.Mode
-	t.Cleanup(func() { Cfg.Mode = originalMode })
-
-	Cfg.Mode = "console"
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	hookPrint(context.Background(), "stdout模式: %s", "abc")
-	w.Close()
-	os.Stdout = old
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
-	output := buf.String()
-	if !strings.Contains(output, "stdout模式: abc") {
-		t.Errorf("hookPrint 未输出预期内容, got: %s", output)
-	}
+	// Case 2: Debug module is disabled
+	output = captureStdout(func() {
+		Log(context.Background(), "other_module", "this should not be printed")
+	})
+	assert.Empty(t, output, "There should be no output for a disabled module")
 }

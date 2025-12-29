@@ -8,6 +8,7 @@ type Config struct {
 	Addrs              []string `mapstructure:"addrs" json:"addrs"`                               // redis addrs ip:port
 	Password           string   `mapstructure:"password" json:"password"`                         // redis password
 	Db                 int      `mapstructure:"db" json:"db"`                                     // redis db
+	IsCluster          bool     `mapstructure:"is_cluster" json:"is_cluster"`                     // 是否为集群模式
 	IsLog              bool     `mapstructure:"is_log" json:"is_log"`                             // 是否记录日志
 	PoolSize           int      `mapstructure:"pool_size" json:"pool_size"`                       // 连接池大小
 	IdleTimeout        int      `mapstructure:"idle_timeout" json:"idle_timeout"`                 // 空闲连接超时时间，单位秒
@@ -18,11 +19,14 @@ type Config struct {
 	SlowThreshold      int      `mapstructure:"slow_threshold" json:"slow_threshold"`             // 慢查询阈值，单位毫秒
 }
 
-var Cfgs = make(map[string]*Config)
+var (
+	Cfgs           = make(map[string]*Config)
+	defaultManager *Manager
+)
 
 func init() {
 	config.Register("redis", &Cfgs)
-	config.RegisterCallback("redis", Init)
+	config.RegisterCallback("redis", Init, "config", "log")
 }
 
 // HealthStatus Redis健康状态

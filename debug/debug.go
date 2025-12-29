@@ -9,38 +9,35 @@ import (
 	"github.com/jessewkun/gocommon/logger"
 )
 
-const TAG = "DEBUG"
-
-// InitDebug 初始化debug
-func InitDebug(flag string) DebugFunc {
-	return func(c context.Context, format string, v ...interface{}) {
-		if IsDebug(flag) {
-			hookPrint(c, format, v...)
-		}
+// Log 如果指定模块的调试开关已开启，则输出调试信息。
+// 这是推荐使用的唯一调试函数。
+func Log(ctx context.Context, module string, format string, v ...interface{}) {
+	if defaultDebugger.isDebug(module) {
+		// 将 module 作为 tag 传递
+		printMessage(ctx, module, format, v...)
 	}
 }
 
-// IsDebug 是否开启debug
-func IsDebug(flag string) bool {
-	enable := false
-	for _, part := range Cfg.Module {
-		if part == flag {
-			enable = true
-			break
-		}
-	}
-	return enable
+// IsDebug 检查指定模块的调试是否开启。
+func IsDebug(module string) bool {
+	return defaultDebugger.isDebug(module)
 }
 
-// hookPrint 输出debug信息
-func hookPrint(c context.Context, format string, v ...interface{}) {
+// printMessage 内部函数，负责实际的打印逻辑
+func printMessage(ctx context.Context, module string, format string, v ...interface{}) {
 	msg := fmt.Sprintf(format, v...)
-	if Cfg.Mode == "log" {
-		logger.Debug(c, TAG, msg)
+
+	defaultDebugger.mu.RLock()
+	mode := defaultDebugger.Config.Mode
+	defaultDebugger.mu.RUnlock()
+
+	tag := "DEBUG_" + module
+	if mode == "log" {
+		logger.Debug(ctx, tag, "%s", msg) // 使用 module 作为 tag
 	} else {
 		fmt.Printf("[DEBUG][%s][%s] %s\n",
 			time.Now().Format("2006-01-02 15:04:05"),
-			TAG,
+			tag, // 使用 module 作为 tag
 			msg)
 	}
 }

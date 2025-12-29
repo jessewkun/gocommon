@@ -53,22 +53,19 @@ func (m *Manager) GetDefaultCache(name string) (Cache, error) {
 	return cache, nil
 }
 
-// GetTypedCache 获取或创建类型安全缓存
-func (m *Manager) GetTypedCache(name string, maxEntriesInWindow int) (interface{}, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	if cache, exists := m.caches[name]; exists {
-		return cache, nil
-	}
-
-	cache, err := NewBigCacheWithSize(maxEntriesInWindow)
+// GetTypedCache 是一个泛型辅助函数，用于从管理器中获取或创建类型安全的缓存。
+// 注意：此函数为独立函数，而非Manager的方法，以正确支持泛型。
+func GetTypedCache[T any](m *Manager, name string, maxEntriesInWindow int) (TypedCache[T], error) {
+	// 复用GetCache的逻辑来获取底层的非类型化缓存
+	cache, err := m.GetCache(name, maxEntriesInWindow)
 	if err != nil {
-		return nil, err
+		// 返回泛型零值
+		var zero TypedCache[T]
+		return zero, err
 	}
 
-	m.caches[name] = cache
-	return cache, nil
+	// 将获取到的Cache实例包装成类型安全的TypedCache
+	return &typedCache[T]{cache: cache}, nil
 }
 
 // RemoveCache 移除缓存
@@ -84,7 +81,7 @@ func (m *Manager) RemoveCache(name string) bool {
 	return false
 }
 
-// ClearAll 清空所有缓存
+// ClearAll 关闭并移除所有缓存
 func (m *Manager) ClearAll() {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()

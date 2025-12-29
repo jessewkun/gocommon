@@ -38,16 +38,21 @@ func (h *RedisHook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (context
 }
 
 func (h *RedisHook) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
-	startTime := ctx.Value(RedisStartTimeKey).(time.Time)
+	startTimeVal := ctx.Value(RedisStartTimeKey)
+	startTime, ok := startTimeVal.(time.Time)
+	if !ok {
+		logger.Warn(ctx, TAG, "Could not find start time in context for redis command")
+		return nil
+	}
 	duration := time.Since(startTime)
 
 	fields := map[string]interface{}{
-		"cmd":      cmd.String(),
+		"cmd":      cmd.Args(),
 		"duration": duration,
 		"status":   "success",
 	}
 
-	if cmd.Err() != nil {
+	if cmd.Err() != nil && cmd.Err() != redis.Nil {
 		fields["status"] = "error"
 		fields["error"] = cmd.Err().Error()
 	}
@@ -68,7 +73,12 @@ func (h *RedisHook) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cmde
 }
 
 func (h *RedisHook) AfterProcessPipeline(ctx context.Context, cmds []redis.Cmder) error {
-	startTime := ctx.Value(RedisStartTimeKey).(time.Time)
+	startTimeVal := ctx.Value(RedisStartTimeKey)
+	startTime, ok := startTimeVal.(time.Time)
+	if !ok {
+		logger.Warn(ctx, TAG, "Could not find start time in context for redis command")
+		return nil
+	}
 	duration := time.Since(startTime)
 
 	// 统计成功和失败的命令数

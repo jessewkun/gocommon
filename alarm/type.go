@@ -1,12 +1,13 @@
 package alarm
 
 import (
+	"context"
 	"fmt"
-	"net/http"
-	"sync"
 	"time"
 
 	"github.com/jessewkun/gocommon/config"
+	"github.com/jessewkun/gocommon/http"
+	"github.com/jessewkun/gocommon/logger"
 	"github.com/spf13/viper"
 )
 
@@ -21,27 +22,29 @@ func (c *Config) String() string {
 }
 
 // Reload 重新加载 alarm 配置.
-// alarm模块的所有配置项都被认为是安全的，可以进行热更新.
-func (c *Config) Reload(v *viper.Viper) {
+// alarm 模块的所有配置项都被认为是安全的，可以进行热更新.
+func (c *Config) Reload(v *viper.Viper) error {
 	if err := v.UnmarshalKey("alarm", c); err != nil {
-		fmt.Printf("failed to reload alarm config: %v\n", err)
-		return
+		logger.ErrorWithMsg(context.Background(), "ALARM", "failed to reload alarm config: %v", err)
+		return err
 	}
-	fmt.Printf("alarm config reload success, config: %+v\n", c)
+	logger.Info(context.Background(), "ALARM", "alarm config reload success, config: %+v", c)
+	// 重新初始化http客户端以应用新的超时设置
+	Init()
+	return nil
 }
 
 const TAG = "ALARM"
 const MaxRetry = 2
 
 var (
-	Cfg    = DefaultConfig()
-	client *http.Client
-	mu     sync.RWMutex
+	Cfg             = DefaultConfig()
+	alarmHTTPClient *http.Client // 使用 @http 模块的客户端
 )
 
 func init() {
 	config.Register("alarm", Cfg)
-	config.RegisterCallback("alarm", Init)
+	config.RegisterCallback("alarm", Init, "config", "http", "log")
 }
 
 // DefaultConfig 返回默认配置
@@ -55,20 +58,12 @@ func DefaultConfig() *Config {
 
 // Init 初始化报警系统
 func Init() error {
-	mu.Lock()
-	defer mu.Unlock()
-
-	// 创建 HTTP 客户端
-	client = &http.Client{
+	isLog := false
+	alarmHTTPClient = http.NewClient(http.Option{
 		Timeout: time.Duration(Cfg.Timeout) * time.Second,
-	}
+		Retry:   MaxRetry,
+		IsLog:   &isLog, // 报警模块不记录自己的请求日志，避免循环
+	})
 
 	return nil
-}
-
-// getHTTPClient 获取 HTTP 客户端
-func getHTTPClient() *http.Client {
-	mu.RLock()
-	defer mu.RUnlock()
-	return client
 }

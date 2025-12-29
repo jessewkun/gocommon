@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+
+	"github.com/jessewkun/gocommon/http"
 )
 
 const (
@@ -41,16 +43,24 @@ func (b *Bark) Send(ctx context.Context, title string, content []string) error {
 			defer wg.Done()
 
 			// 构建URL
-			url := fmt.Sprintf(barkAPI, barkID, url.QueryEscape(title), url.QueryEscape(contentStr))
+			barkURL := fmt.Sprintf(barkAPI, barkID, url.QueryEscape(title), url.QueryEscape(contentStr))
 
-			req := &HTTPRequest{
-				Method: "GET",
-				URL:    url,
+			// 使用 @http 模块发送请求
+			req := http.RequestGet{
+				URL: barkURL,
 			}
 
-			if err := SendHTTPRequestWithRetry(ctx, req, MaxRetry); err != nil {
+			resp, err := alarmHTTPClient.Get(ctx, req)
+			if err != nil {
 				mu.Lock()
-				errors = append(errors, fmt.Errorf("bark device %s failed: %v", barkID, err))
+				errors = append(errors, fmt.Errorf("bark device %s request failed: %v", barkID, err))
+				mu.Unlock()
+				return
+			}
+
+			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+				mu.Lock()
+				errors = append(errors, fmt.Errorf("bark device %s unexpected status code: %d", barkID, resp.StatusCode))
 				mu.Unlock()
 			}
 		}(barkID)

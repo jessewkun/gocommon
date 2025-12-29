@@ -24,7 +24,7 @@ alwaysApply: false
 - 在有利于API性能时利用Go的内置并发特性。
 - 遵循RESTful API设计原则和最佳实践。
 - 包含必要的导入、包声明和任何所需的设置代码。
-- 使用 github.com/ZhongMingEnergy/gocommon/logger 日志记录器实现适当的日志记录。
+- 使用 github.com/jessewkun/gocommon/logger 日志记录器实现适当的日志记录。
 - 考虑为横切关注点实现中间件（例如，日志记录、身份验证）。
 - 在API实现中不留todos、占位符或缺失部分。
 - 在解释时保持简洁，但为复杂逻辑或Go特定惯用法提供简短注释。

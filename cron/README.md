@@ -12,8 +12,9 @@
 - **🔗 钩子机制**：提供 `BeforeRun` 和 `AfterRun` 钩子，支持任务前置和后置处理
 - **🎯 手动触发**：支持手动执行指定任务，便于测试和运维
 - **📊 完整日志**：详细的执行日志，包含链路追踪和性能统计
-- **⚙️ 全局管理**：支持全局任务管理器，简化任务注册和管理
 - **🚫 任务隔离**：单个任务异常不影响其他任务执行
+- **🔒 防重叠执行**：自动跳过仍在运行的任务，避免任务重叠执行（仅单机环境）
+- **⚙️ 配置化任务**：支持通过配置文件动态配置任务调度参数
 
 ## 快速开始
 
@@ -44,15 +45,7 @@ func main() {
     manager := cron.NewManager()
 
     // 注册任务
-    manager.RegisterTask(&MyTask{
-        BaseTask: cron.BaseTask{
-            TaskName:    "my_task",
-            TaskDesc:    "我的定时任务",
-            TaskEnabled: true,
-            TaskSpec:    "0 */5 * * * *", // 每5分钟执行一次
-            TaskTimeout: 30 * time.Second,
-        },
-    })
+    manager.RegisterTask(&MyTask{})
 
     // 启动管理器
     ctx := context.Background()
@@ -63,7 +56,7 @@ func main() {
 }
 ```
 
-### 2. 自动注册（推荐）
+### 2. 配置化任务（推荐）
 
 ```go
 package main
@@ -84,22 +77,24 @@ func (t *DataCleanupTask) Run(ctx context.Context) error {
     return nil
 }
 
-// 自动注册任务
-func init() {
-    cron.AutoRegisterTask(&DataCleanupTask{
-        BaseTask: cron.BaseTask{
-            TaskName:    "data_cleanup",
-            TaskDesc:    "数据清理任务",
-            TaskEnabled: true,
-            TaskSpec:    "0 0 2 * * *", // 每天凌晨2点执行
-            TaskTimeout: 10 * time.Minute,
-        },
-    })
-}
-
 func main() {
-    // 创建管理器会自动注册所有任务
+    // 创建管理器
     manager := cron.NewManager()
+
+    // 从配置文件读取任务配置
+    taskConfig := cron.TaskConfig{
+        Key:     "data_cleanup",
+        Desc:    "数据清理任务",
+        Spec:    "0 0 2 * * *", // 每天凌晨2点执行
+        Enabled: true,
+        Timeout: "10m",
+    }
+
+    // 创建配置化任务
+    configurableTask := cron.NewConfigurableTask(&DataCleanupTask{}, taskConfig)
+
+    // 注册任务
+    manager.RegisterTask(configurableTask)
 
     // 启动管理器
     ctx := context.Background()
@@ -110,21 +105,87 @@ func main() {
 
 ## 详细功能
 
-### 任务配置
-
-#### BaseTask 结构
+### 任务接口
 
 ```go
-type BaseTask struct {
-    TaskName    string        // 任务名称（唯一标识）
-    TaskDesc    string        // 任务描述
-    TaskEnabled bool          // 是否启用任务
-    TaskSpec    string        // cron 调度表达式
-    TaskTimeout time.Duration // 任务超时时间（0表示不超时）
+// Task 定时任务接口
+type Task interface {
+    Key() string                                    // 任务标识
+    Spec() string                                   // cron 表达式
+    BeforeRun(ctx context.Context) error           // 执行前钩子
+    Run(ctx context.Context) error                  // 任务执行
+    AfterRun(ctx context.Context) error            // 执行后钩子
+    Timeout() time.Duration                         // 超时时间
+    Enabled() bool                                  // 是否启用
 }
 ```
 
-#### Cron 表达式格式
+### BaseTask 基类
+
+`BaseTask` 提供任务接口的默认实现，简化任务开发：
+
+```go
+type BaseTask struct {
+    // 空结构体，提供默认方法实现
+}
+
+// 默认实现的方法：
+// - Key(): 返回空字符串
+// - Desc(): 返回空字符串
+// - Spec(): 返回空字符串
+// - Enabled(): 返回 false
+// - Timeout(): 返回 0（不超时）
+// - BeforeRun(): 空实现
+// - Run(): 空实现
+// - AfterRun(): 空实现
+```
+
+### 配置化任务
+
+`ConfigurableTask` 是一个包装器，允许通过配置文件动态配置任务调度参数：
+
+```go
+// TaskConfig 任务配置结构
+type TaskConfig struct {
+    Key     string `mapstructure:"key"`     // 任务标识
+    Desc    string `mapstructure:"desc"`    // 任务描述
+    Spec    string `mapstructure:"spec"`    // CRON表达式
+    Enabled bool   `mapstructure:"enabled"` // 是否启用
+    Timeout string `mapstructure:"timeout"` // 超时时间，例如 "5m", "1h"
+}
+
+// 使用配置化任务
+func main() {
+    manager := cron.NewManager()
+
+    // 从配置文件读取任务配置
+    taskConfig := cron.TaskConfig{
+        Key:     "my_task",
+        Desc:    "我的定时任务",
+        Spec:    "0 */5 * * * *",
+        Enabled: true,
+        Timeout: "30s",
+    }
+
+    // 创建配置化任务
+    configurableTask := cron.NewConfigurableTask(&MyTask{}, taskConfig)
+
+    // 注册任务
+    manager.RegisterTask(configurableTask)
+
+    // 启动管理器
+    ctx := context.Background()
+    manager.Start(ctx)
+    defer manager.Stop()
+}
+```
+
+**配置化任务的优势：**
+- **动态配置**：无需重新编译即可调整任务调度参数
+- **环境隔离**：不同环境可以使用不同的任务配置
+- **运维友好**：运维人员可以直接修改配置文件调整任务行为
+
+### Cron 表达式格式
 
 支持标准 cron 表达式，包含秒级精度：
 
@@ -153,7 +214,7 @@ func (t *MyTask) BeforeRun(ctx context.Context) error {
     t.initResources()
 
     // 记录任务开始
-    logger.Info(ctx, "TASK", "Task %s starting", t.TaskName)
+    logger.Info(ctx, "TASK", "Task %s starting", t.Key())
 
     return nil
 }
@@ -207,14 +268,15 @@ func (t *LongRunningTask) Run(ctx context.Context) error {
 }
 
 // 配置超时时间
-AutoRegisterTask(&LongRunningTask{
-    BaseTask: cron.BaseTask{
-        TaskName:    "long_task",
-        TaskEnabled: true,
-        TaskSpec:    "0 */10 * * * *",
-        TaskTimeout: 5 * time.Minute, // 5分钟超时
-    },
-})
+taskConfig := cron.TaskConfig{
+    Key:     "long_task",
+    Enabled: true,
+    Spec:    "0 */10 * * * *",
+    Timeout: "5m", // 5分钟超时
+}
+
+configurableTask := cron.NewConfigurableTask(&LongRunningTask{}, taskConfig)
+manager.RegisterTask(configurableTask)
 ```
 
 ### 错误处理
@@ -254,10 +316,10 @@ userManager := cron.NewManager()
 orderManager := cron.NewManager()
 
 // 注册用户相关任务
-userManager.RegisterTask(&UserTask{...})
+userManager.RegisterTask(&UserTask{})
 
 // 注册订单相关任务
-orderManager.RegisterTask(&OrderTask{...})
+orderManager.RegisterTask(&OrderTask{})
 
 // 分别启动
 userManager.Start(ctx)
@@ -327,6 +389,8 @@ func (t *MyTask) AfterRun(ctx context.Context) error {
 - 使用异步执行处理耗时任务
 - 避免在任务中执行阻塞操作
 - 合理使用 BeforeRun/AfterRun 钩子
+- 框架自动防止任务重叠执行，无需担心任务冲突（仅单机环境）
+- **重要提醒**：分布式环境下需要额外的协调机制来防止任务重复执行
 
 ## API 参考
 
@@ -335,13 +399,13 @@ func (t *MyTask) AfterRun(ctx context.Context) error {
 ```go
 // Task 定时任务接口
 type Task interface {
-    Name() string                                    // 任务名称
-    Spec() string                                    // cron 表达式
-    BeforeRun(ctx context.Context) error            // 执行前钩子
-    Run(ctx context.Context) error                   // 任务执行
-    AfterRun(ctx context.Context) error             // 执行后钩子
-    Timeout() time.Duration                          // 超时时间
-    Enabled() bool                                   // 是否启用
+    Key() string                                    // 任务标识
+    Spec() string                                   // cron 表达式
+    BeforeRun(ctx context.Context) error           // 执行前钩子
+    Run(ctx context.Context) error                  // 任务执行
+    AfterRun(ctx context.Context) error            // 执行后钩子
+    Timeout() time.Duration                         // 超时时间
+    Enabled() bool                                  // 是否启用
 }
 ```
 
@@ -370,21 +434,43 @@ func (m *Manager) GetTaskNames() []string
 func (m *Manager) IsRunning() bool
 ```
 
+### 配置类型
+
+```go
+// TaskConfig 任务配置结构
+type TaskConfig struct {
+    Key     string `mapstructure:"key"`     // 任务标识
+    Desc    string `mapstructure:"desc"`    // 任务描述
+    Spec    string `mapstructure:"spec"`    // CRON表达式
+    Enabled bool   `mapstructure:"enabled"` // 是否启用
+    Timeout string `mapstructure:"timeout"` // 超时时间，例如 "5m", "1h"
+}
+
+// ConfigurableTask 配置化任务包装器
+type ConfigurableTask struct {
+    Task              // 嵌入基础任务接口
+    config TaskConfig // 持有从配置文件解析的调度信息
+}
+```
+
 ### 全局函数
 
 ```go
-// 自动注册任务
-func AutoRegisterTask(task Task) error
+// 创建配置化任务
+func NewConfigurableTask(task Task, cfg TaskConfig) *ConfigurableTask
 ```
 
 ## 注意事项
 
-1. **任务名称唯一性**：确保每个任务名称在管理器中唯一
+1. **任务名称唯一性**：确保每个任务标识在管理器中唯一
 2. **Cron 表达式格式**：使用 6 位格式（包含秒）
 3. **超时设置**：合理设置任务超时时间，避免资源占用
 4. **错误处理**：在任务中正确处理错误，避免静默失败
 5. **资源清理**：在 AfterRun 中清理资源，防止内存泄漏
 6. **并发安全**：任务本身不需要考虑并发安全，框架保证串行执行
+7. **任务重叠**：框架自动防止任务重叠执行，如果上一个任务还在运行，会跳过本次调度
+8. **配置化任务**：推荐使用 ConfigurableTask 进行任务配置，便于运维管理
+9. **⚠️ 分布式环境限制**：当前实现仅在单机环境下避免任务重叠执行，**分布式环境没有实现**。在多实例部署时，同一个任务可能在多个实例上同时执行
 
 ## 示例项目
 

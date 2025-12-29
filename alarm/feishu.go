@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/jessewkun/gocommon/http"
 )
 
 type Feishu struct {
@@ -86,22 +88,25 @@ func (f *Feishu) Send(ctx context.Context, title string, content []string) error
 	// 序列化消息
 	payload, err := json.Marshal(message)
 	if err != nil {
-		return fmt.Errorf("failed to marshal feishu message: %v", err)
+		return fmt.Errorf("failed to marshal feishu message: %w", err)
 	}
 
-	// 创建HTTP请求
-	req := &HTTPRequest{
-		Method: "POST",
-		URL:    f.WebhookURL,
+	// 使用 @http 模块发送请求
+	req := http.RequestPost{
+		URL:     f.WebhookURL,
+		Payload: payload, // resty 会自动处理序列化，但我们已手动序列化以构建完整FeishuMessage，这里传递字节
 		Headers: map[string]string{
 			"Content-Type": "application/json",
 		},
-		Body: payload,
 	}
 
-	// 发送请求（带重试）
-	if err := SendHTTPRequestWithRetry(ctx, req, MaxRetry); err != nil {
-		return fmt.Errorf("failed to send feishu message: %v", err)
+	resp, err := alarmHTTPClient.Post(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to send feishu request: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("unexpected status code from feishu: %d, body: %s", resp.StatusCode, string(resp.Body))
 	}
 
 	return nil
@@ -109,6 +114,9 @@ func (f *Feishu) Send(ctx context.Context, title string, content []string) error
 
 // genSign 生成 Feishu 签名
 func genSign(secret string, timestamp int64) (string, error) {
+	if len(secret) == 0 {
+		return "", nil
+	}
 	//timestamp + key 做sha256, 再进行base64 encode
 	stringToSign := fmt.Sprintf("%v", timestamp) + "\n" + secret
 	var data []byte

@@ -1,7 +1,7 @@
 # 基础配置
 mode = "debug"
 port = ":8000"
-app_name = "service"
+app_name = "Service"
 domain = "http://localhost:8000"
 
 # 日志配置
@@ -16,12 +16,12 @@ alarm_level = "warn"
 
 # 报警配置
 [alarm]
+timeout = 5
   [alarm.bark]
-    bark_ids = ["jT64URJj8b6Fp9Y3nVKJiP"]
+    bark_ids = [""]
   [alarm.feishu]
     webhook_url = ""
     secret = ""
-timeout = 5
 
 # HTTP客户端配置
 [http]
@@ -39,7 +39,8 @@ mode = "console"
     dsn = ["user:password@tcp(localhost:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"]
     max_conn = 100
     max_idle_conn = 25
-    conn_max_life = 3600
+    conn_max_life_time = 3600
+    conn_max_idle_time = 600
     slow_threshold = 500
     ignore_record_not_found_error = true
     log_level = "info"
@@ -51,7 +52,8 @@ mode = "console"
     ]
     max_conn = 50
     max_idle_conn = 10
-    conn_max_life = 3600
+    conn_max_life_time = 3600
+    conn_max_idle_time = 600
     slow_threshold = 1000
     ignore_record_not_found_error = true
     log_level = "info"
@@ -118,11 +120,15 @@ mode = "console"
     addresses = ["http://localhost:9200"]
     username = ""
     password = ""
+    is_log = true
+    slow_threshold = 1000
 
   [elasticsearch.cluster]
     addresses = ["http://localhost:9200", "http://localhost:9201", "http://localhost:9202"]
     username = "elastic"
     password = "password"
+    is_log = true
+    slow_threshold = 1000
 
 # Nacos配置
 [nacos]
@@ -134,6 +140,10 @@ mode = "console"
     username = ""
     password = ""
     timeout = 5000
+    not_load_cache_at_start = true
+    log_dir = "/tmp/nacos/log"
+    cache_dir = "/tmp/nacos/cache"
+    log_level = "warn"
 
   [nacos.production]
     host = "nacos.example.com"
@@ -143,3 +153,27 @@ mode = "console"
     username = "nacos"
     password = "nacos"
     timeout = 10000
+    not_load_cache_at_start = true
+    log_dir = "/tmp/nacos/log"
+    cache_dir = "/tmp/nacos/cache"
+    log_level = "warn"
+
+# Cron定时任务配置
+[cron]
+  [[cron.example]]
+    key = "example"
+    desc = "example"
+    spec = "0 * * * * *" # 每分执行一次
+    enabled = true
+    timeout = "10m"
+
+# OSS (对象存储) 配置 (以MinIO为例)
+[oss]
+    bucket = "localhost:9000"
+    public_endpoint = "http://localhost"
+    endpoint = "localhost"
+    region_endpoint = "localhost"
+    access_key = ""
+    secret_key = ""
+    role_arn = ""
+    region = ""

@@ -38,6 +38,7 @@ func ExampleRedisUsage() {
 			Addrs:              []string{"localhost:6379"},
 			Password:           "",
 			Db:                 0,
+			IsCluster:          false, // 明确指定为非集群模式
 			IsLog:              true,
 			PoolSize:           100,
 			IdleTimeout:        300,
@@ -51,6 +52,7 @@ func ExampleRedisUsage() {
 			Addrs:              []string{"localhost:7000", "localhost:7001", "localhost:7002"},
 			Password:           "",
 			Db:                 0,
+			IsCluster:          true, // 明确指定为集群模式
 			IsLog:              true,
 			PoolSize:           50,
 			IdleTimeout:        300,
@@ -70,6 +72,7 @@ func ExampleRedisUsage() {
 	defer Close()
 
 	// 3. 获取 Redis 连接
+	// GetConn 返回的是一个 redis.UniversalClient 接口，它统一了单机和集群客户端
 	client, err := GetConn("default")
 	if err != nil {
 		log.Fatalf("Failed to get Redis connection: %v", err)

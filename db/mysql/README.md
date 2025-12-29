@@ -1,13 +1,12 @@
 # MySQL 数据库模块
 
-本模块提供了 MySQL 数据库的封装，支持连接管理、事务处理、健康检查等功能。
+本模块提供了 MySQL 数据库的封装，支持连接管理、健康检查等功能。
 
 ## 功能特性
 
 -   ✅ 支持多实例连接管理
--   ✅ 支持连接池配置
+-   ✅ 支持连接池配置（最大连接数、最大空闲连接数、连接最大生命周期、连接最大空闲时间）
 -   ✅ 支持读写分离配置
--   ✅ 支持事务处理
 -   ✅ 支持健康检查
 -   ✅ 支持优雅关闭
 -   ✅ 支持日志记录
@@ -94,13 +93,14 @@ jsonData, _ := json.Marshal(event)
 
 ```go
 type Config struct {
-    Dsn                       []string // 数据源
-    MaxConn                   int      // 最大连接数
-    MaxIdleConn               int      // 最大空闲连接数
-    ConnMaxLife               int      // 连接最长持续时间，默认1小时，单位秒
-    SlowThreshold             int      // 慢查询阈值，单位毫秒，默认500毫秒
-    IgnoreRecordNotFoundError bool     // 是否忽略记录未找到错误
-    LogLevel                  string   // 日志级别：silent/error/warn/info，默认silent
+    Dsn                       []string `mapstructure:"dsn" json:"dsn"`                                                     // 数据源（第一个为主库，后续为从库）
+    MaxConn                   int      `mapstructure:"max_conn" json:"max_conn"`                                           // 最大连接数
+    MaxIdleConn               int      `mapstructure:"max_idle_conn" json:"max_idle_conn"`                                 // 最大空闲连接数
+    ConnMaxLifeTime           int      `mapstructure:"conn_max_life_time" json:"conn_max_life_time"`                       // 连接最长持续时间， 默认1小时，单位秒
+    ConnMaxIdleTime           int      `mapstructure:"conn_max_idle_time" json:"conn_max_idle_time"`                       // 连接最大空闲时间， 默认10分钟，单位秒
+    SlowThreshold             int      `mapstructure:"slow_threshold" json:"slow_threshold"`                               // 慢查询阈值，单位毫秒，默认500毫秒
+    IgnoreRecordNotFoundError bool     `mapstructure:"ignore_record_not_found_error" json:"ignore_record_not_found_error"` // 是否忽略记录未找到错误
+    LogLevel                  string   `mapstructure:"log_level" json:"log_level"`                                         // 日志级别：silent/error/warn/info，默认silent
 }
 ```
 
@@ -119,7 +119,8 @@ mysqlConfig := map[string]*Config{
         Dsn:     []string{"user:password@tcp(localhost:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"},
         MaxConn: 100,
         MaxIdleConn: 25,
-        ConnMaxLife: 3600,
+        ConnMaxLifeTime: 3600,
+        ConnMaxIdleTime: 600,
         SlowThreshold: 500,
         IgnoreRecordNotFoundError: true,
         LogLevel: "info", // 输出所有SQL日志
@@ -132,7 +133,8 @@ mysqlConfig := map[string]*Config{
         },
         MaxConn: 50,
         MaxIdleConn: 10,
-        ConnMaxLife: 3600,
+        ConnMaxLifeTime: 3600,
+        ConnMaxIdleTime: 600,
         SlowThreshold: 1000,
         IgnoreRecordNotFoundError: true,
         LogLevel: "warn", // 只输出慢查询和错误日志
@@ -189,7 +191,7 @@ mysqlConfig := map[string]*Config{
 ### 1. 初始化连接
 
 ```go
-import "github.com/ZhongMingEnergy/gocommon/db/mysql"
+import "github.com/jessewkun/gocommon/db/mysql"
 
 // 初始化 MySQL 连接
 if err := mysql.Init(); err != nil {
@@ -213,30 +215,7 @@ if err := db.Find(&users).Error; err != nil {
 }
 ```
 
-### 3. 事务处理
-
-```go
-// 创建事务
-tx := mysql.NewTransaction(db)
-
-// 在事务中执行操作
-if err := tx.tx.Create(&user).Error; err != nil {
-    tx.Rollback()
-    return err
-}
-
-if err := tx.tx.Update(&order).Error; err != nil {
-    tx.Rollback()
-    return err
-}
-
-// 提交事务
-if err := tx.Commit(); err != nil {
-    return err
-}
-```
-
-### 4. 健康检查
+### 3. 健康检查
 
 ```go
 // 健康检查
@@ -246,12 +225,27 @@ for dbName, status := range healthStatus {
 }
 ```
 
-### 5. 关闭连接
+HealthStatus 字段说明：
+
+-   `status`: success/error
+-   `error`: 错误信息（当 status=error 时）
+-   `latency`: Ping 延迟，毫秒
+-   `timestamp`: 检查时间戳（毫秒）
+-   `max_open`: 最大连接数
+-   `open`: 当前打开连接数
+-   `in_use`: 正在使用连接数
+-   `idle`: 空闲连接数
+-   `wait_count`: 等待连接总次数
+-   `wait_time`: 等待连接总时长（纳秒）
+
+### 4. 关闭连接
 
 ```go
-// 关闭连接
+// 关闭所有连接
 if err := mysql.Close(); err != nil {
     log.Printf("Failed to close MySQL connections: %v", err)
+} else {
+    log.Println("MySQL connections closed successfully")
 }
 ```
 
@@ -271,7 +265,7 @@ mysqlConfig := map[string]*Config{
         },
         MaxConn: 100,
         MaxIdleConn: 25,
-        ConnMaxLife: 3600,
+        ConnMaxLifeTime: 3600,
         SlowThreshold: 500,
         IgnoreRecordNotFoundError: true,
         LogLevel: "warn", // 只输出慢查询和错误日志
@@ -289,7 +283,8 @@ mysqlConfig := map[string]*Config{
 
 -   `MaxConn`: 最大连接数
 -   `MaxIdleConn`: 最大空闲连接数
--   `ConnMaxLife`: 连接最长持续时间
+-   `ConnMaxLifeTime`: 连接最长生命周期（秒）
+-   `ConnMaxIdleTime`: 连接最大空闲时间（秒）
 
 ### 慢查询监控
 
@@ -310,9 +305,8 @@ mysqlConfig := map[string]*Config{
 模块提供了完善的错误处理机制：
 
 1. **连接错误**: 自动重试和日志记录
-2. **事务错误**: 自动回滚
-3. **超时错误**: 可配置的超时时间
-4. **健康检查**: 定期检查连接状态
+2. **超时错误**: 可配置的超时时间
+3. **健康检查**: 定期检查连接状态
 
 ## 性能优化
 
@@ -326,9 +320,8 @@ mysqlConfig := map[string]*Config{
 1. **连接字符串**: 确保连接字符串格式正确，支持认证和 SSL
 2. **超时配置**: 根据网络环境调整超时时间
 3. **连接池大小**: 根据并发量和服务器资源调整连接池大小
-4. **事务使用**: 合理使用事务，确保数据一致性
-5. **索引创建**: 建议在查询字段上创建索引以提高性能
-6. **日志级别**: 根据环境需要合理配置日志级别，避免生产环境输出过多日志
+4. **索引创建**: 建议在查询字段上创建索引以提高性能
+5. **日志级别**: 根据环境需要合理配置日志级别，避免生产环境输出过多日志
 
 ## 示例代码
 

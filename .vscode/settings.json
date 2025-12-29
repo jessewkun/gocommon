@@ -5,6 +5,16 @@
     "editor.codeActionsOnSave": {
         "source.fixAll.eslint": "explicit"
     },
+    "[toml]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": false,
+        "editor.defaultFormatter": null // 禁用插件影响
+    },
+    "[yaml]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true
+    },
     "files.eol": "\n",
     "files.trimTrailingWhitespace": true,
     "files.trimFinalNewlines": true,

@@ -1,260 +1,260 @@
 name: CI/CD Pipeline
 
 on:
-  pull_request:
-    branches: [ main ]
+    pull_request:
+        branches: [main]
 
 env:
-  GO_VERSION: '1.23.10'
+    GO_VERSION: "1.24.11"
 
 jobs:
-  # 代码质量检查
-  lint:
-    name: 代码质量检查
-    runs-on: ubuntu-latest
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
+    # 代码质量检查
+    lint:
+        name: 代码质量检查
+        runs-on: ubuntu-latest
+        steps:
+            - name: 检出代码
+              uses: actions/checkout@v4
 
-      - name: 设置 Go 环境
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+            - name: 设置 Go 环境
+              uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache: true
 
-      - name: 安装 staticcheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+            - name: 安装 staticcheck
+              run: go install honnef.co/go/tools/cmd/staticcheck@latest
 
-      - name: 运行 staticcheck
-        run: staticcheck -tests=false ./...
+            - name: 运行 staticcheck
+              run: staticcheck -tests=false ./...
 
-  # 安全扫描
-  security:
-    name: 安全扫描
-    runs-on: ubuntu-latest
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
+    # 安全扫描
+    security:
+        name: 安全扫描
+        runs-on: ubuntu-latest
+        steps:
+            - name: 检出代码
+              uses: actions/checkout@v4
 
-      - name: 设置 Go 环境
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+            - name: 设置 Go 环境
+              uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache: true
 
-      - name: 安装 gosec
-        run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
+            - name: 安装 gosec
+              run: |
+                  go install github.com/securego/gosec/v2/cmd/gosec@latest
 
-      - name: 运行 gosec 安全扫描
-        run: gosec -fmt=json -out=security-report.json ./... || true
+            - name: 运行 gosec 安全扫描
+              run: gosec -fmt=json -out=security-report.json ./... || true
 
-      - name: 上传安全扫描报告
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: security-report
-          path: security-report.json
+            - name: 上传安全扫描报告
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: security-report
+                  path: security-report.json
 
-  # 单元测试
-  test:
-    name: 单元测试
-    runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ROOT_PASSWORD: 123456
-          MYSQL_DATABASE: testdb
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping --silent"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+    # 单元测试
+    test:
+        name: 单元测试
+        runs-on: ubuntu-latest
+        services:
+            mysql:
+                image: mysql:8.0
+                env:
+                    MYSQL_ROOT_PASSWORD: 123456
+                    MYSQL_DATABASE: testdb
+                ports:
+                    - 3306:3306
+                options: >-
+                    --health-cmd="mysqladmin ping --silent"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=5
 
-      redis:
-        image: redis:7.2
-        ports:
-          - 6379:6379
-        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=5
+            redis:
+                image: redis:7.2
+                ports:
+                    - 6379:6379
+                options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=5
 
-      mongodb:
-        image: mongo:7.0
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd="mongosh --eval 'db.runCommand({ ping: 1 })'"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+            mongodb:
+                image: mongo:7.0
+                ports:
+                    - 27017:27017
+                options: >-
+                    --health-cmd="mongosh --eval 'db.runCommand({ ping: 1 })'"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=5
 
-      elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
-        env:
-          discovery.type: single-node
-          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
-          xpack.security.enabled: "false"
-        ports:
-          - 9200:9200
-        options: >-
-          --health-cmd="curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"'"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
+            elasticsearch:
+                image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
+                env:
+                    discovery.type: single-node
+                    ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+                    xpack.security.enabled: "false"
+                ports:
+                    - 9200:9200
+                options: >-
+                    --health-cmd="curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"'"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=10
 
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
+        steps:
+            - name: 检出代码
+              uses: actions/checkout@v4
 
-      - name: 设置 Go 环境
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+            - name: 设置 Go 环境
+              uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache: true
 
-      - name: 下载依赖
-        run: go mod download
+            - name: 下载依赖
+              run: go mod download
 
-      - name: 运行单元测试
-        run: go test -v ./... -coverprofile=coverage.out
+            - name: 运行单元测试
+              run: go test -v ./... -coverprofile=coverage.out
 
-      - name: 生成测试覆盖率报告
-        run: go tool cover -html=coverage.out -o coverage.html
+            - name: 生成测试覆盖率报告
+              run: go tool cover -html=coverage.out -o coverage.html
 
-      - name: 上传测试覆盖率报告
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report-${{ env.GO_VERSION }}
-          path: |
-            coverage.out
-            coverage.html
+            - name: 上传测试覆盖率报告
+              uses: actions/upload-artifact@v4
+              with:
+                  name: coverage-report-${{ env.GO_VERSION }}
+                  path: |
+                      coverage.out
+                      coverage.html
 
-  # 依赖检查
-  dependency-check:
-    name: 依赖检查
-    runs-on: ubuntu-latest
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
+    # 依赖检查
+    dependency-check:
+        name: 依赖检查
+        runs-on: ubuntu-latest
+        steps:
+            - name: 检出代码
+              uses: actions/checkout@v4
 
-      - name: 设置 Go 环境
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+            - name: 设置 Go 环境
+              uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache: true
 
-      - name: 检查依赖更新
-        run: go list -u -m all
+            - name: 检查依赖更新
+              run: go list -u -m all
 
-      - name: 检查依赖漏洞
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
+            - name: 检查依赖漏洞
+              run: |
+                  go install golang.org/x/vuln/cmd/govulncheck@latest
+                  govulncheck ./...
 
-  # 代码格式化检查
-  format:
-    name: 代码格式化检查
-    runs-on: ubuntu-latest
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
+    # 代码格式化检查
+    format:
+        name: 代码格式化检查
+        runs-on: ubuntu-latest
+        steps:
+            - name: 检出代码
+              uses: actions/checkout@v4
 
-      - name: 设置 Go 环境
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+            - name: 设置 Go 环境
+              uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache: true
 
-      - name: 检查代码格式
-        run: |
-          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
-            echo "代码格式不正确，请运行 'go fmt ./...' 进行格式化"
-            gofmt -s -l .
-            exit 1
-          fi
+            - name: 检查代码格式
+              run: |
+                  if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+                    echo "代码格式不正确，请运行 'go fmt ./...' 进行格式化"
+                    gofmt -s -l .
+                    exit 1
+                  fi
 
-      - name: 检查导入排序
-        run: |
-          if [ "$(goimports -l . | wc -l)" -gt 0 ]; then
-            echo "导入排序不正确，请运行 'goimports -w .' 进行排序"
-            goimports -l .
-            exit 1
-          fi
+            - name: 检查导入排序
+              run: |
+                  if [ "$(goimports -l . | wc -l)" -gt 0 ]; then
+                    echo "导入排序不正确，请运行 'goimports -w .' 进行排序"
+                    goimports -l .
+                    exit 1
+                  fi
 
-  # 构建检查
-  build:
-    name: 构建检查
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        arch: [amd64, arm64]
-        exclude:
-          - os: windows-latest
-            arch: arm64
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
+    # 构建检查
+    build:
+        name: 构建检查
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                os: [ubuntu-latest, windows-latest, macos-latest]
+                arch: [amd64, arm64]
+                exclude:
+                    - os: windows-latest
+                      arch: arm64
+        steps:
+            - name: 检出代码
+              uses: actions/checkout@v4
 
-      - name: 设置 Go 环境
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+            - name: 设置 Go 环境
+              uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache: true
 
-      - name: 构建项目
-        run: |
-          GOOS=${{ matrix.os == 'windows-latest' && 'windows' || matrix.os == 'macos-latest' && 'darwin' || 'linux' }} \
-          GOARCH=${{ matrix.arch }} \
-          go build -v ./...
+            - name: 构建项目
+              run: |
+                  GOOS=${{ matrix.os == 'windows-latest' && 'windows' || matrix.os == 'macos-latest' && 'darwin' || 'linux' }} \
+                  GOARCH=${{ matrix.arch }} \
+                  go build -v ./...
 
-  # 性能基准测试
-  benchmark:
-    name: 性能基准测试
-    runs-on: ubuntu-latest
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
+    # 性能基准测试
+    benchmark:
+        name: 性能基准测试
+        runs-on: ubuntu-latest
+        steps:
+            - name: 检出代码
+              uses: actions/checkout@v4
 
-      - name: 设置 Go 环境
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+            - name: 设置 Go 环境
+              uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache: true
 
-      - name: 运行基准测试
-        run: |
-          go test -bench=. -benchmem ./... > benchmark.txt 2>&1 || true
+            - name: 运行基准测试
+              run: |
+                  go test -bench=. -benchmem ./... > benchmark.txt 2>&1 || true
 
-      - name: 上传基准测试结果
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-results
-          path: benchmark.txt
+            - name: 上传基准测试结果
+              uses: actions/upload-artifact@v4
+              with:
+                  name: benchmark-results
+                  path: benchmark.txt
 
-  # 文档生成检查
-  docs:
-    name: 文档检查
-    runs-on: ubuntu-latest
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
+    # 文档生成检查
+    docs:
+        name: 文档检查
+        runs-on: ubuntu-latest
+        steps:
+            - name: 检出代码
+              uses: actions/checkout@v4
 
-      - name: 设置 Go 环境
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+            - name: 设置 Go 环境
+              uses: actions/setup-go@v5
+              with:
+                  go-version: ${{ env.GO_VERSION }}
+                  cache: true
 
-      - name: 检查文档完整性
-        run: |
-          # 检查是否有未导出的但应该导出的函数
-          go vet ./...
+            - name: 检查文档完整性
+              run: |
+                  # 检查是否有未导出的但应该导出的函数
+                  go vet ./...
 
-          # 检查 README 文件是否存在
-          if [ ! -f "README.md" ]; then
-            echo "缺少 README.md 文件"
-            exit 1
-          fi
+                  # 检查 README 文件是否存在
+                  if [ ! -f "README.md" ]; then
+                    echo "缺少 README.md 文件"
+                    exit 1
+                  fi

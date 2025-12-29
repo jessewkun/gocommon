@@ -2,11 +2,8 @@
 package mysql
 
 import (
-	"context"
 	"fmt"
 	"time"
-
-	gocommonlog "github.com/jessewkun/gocommon/logger"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -14,23 +11,11 @@ import (
 	"gorm.io/plugin/dbresolver"
 )
 
-// Init 初始化数据库
+// Init 初始化 defaultManager
 func Init() error {
-	var initErr error
-	for dbName, conf := range Cfgs {
-		err := setDefaultConfig(conf)
-		if err != nil {
-			initErr = fmt.Errorf("mysql %s setDefaultConfig error: %w", dbName, err)
-			gocommonlog.ErrorWithMsg(context.Background(), TAG, initErr.Error())
-			break
-		}
-		if err := newClient(dbName, conf); err != nil {
-			initErr = fmt.Errorf("connect to mysql %s faild, error: %w", dbName, err)
-			gocommonlog.ErrorWithMsg(context.Background(), TAG, initErr.Error())
-			break
-		}
-	}
-	return initErr
+	var err error
+	defaultManager, err = NewManager(Cfgs)
+	return err
 }
 
 // setDefaultConfig 设置默认配置
@@ -38,37 +23,26 @@ func setDefaultConfig(conf *Config) error {
 	if len(conf.Dsn) < 1 {
 		return fmt.Errorf("mysql dsn is invalid")
 	}
-
 	if conf.MaxConn == 0 {
 		conf.MaxConn = 50
 	}
-
 	if conf.MaxIdleConn == 0 {
 		conf.MaxIdleConn = 25
 	}
-
-	if conf.ConnMaxLife == 0 {
-		conf.ConnMaxLife = 3600
+	if conf.ConnMaxLifeTime == 0 {
+		conf.ConnMaxLifeTime = 3600
 	}
-
+	if conf.ConnMaxIdleTime == 0 {
+		conf.ConnMaxIdleTime = 600
+	}
 	if conf.SlowThreshold == 0 {
 		conf.SlowThreshold = 500
 	}
-
 	return nil
 }
 
 // newClient 连接数据库
-func newClient(dbName string, conf *Config) error {
-	connList.mu.Lock()
-	defer connList.mu.Unlock()
-
-	if _, ok := connList.conns[dbName]; ok {
-		if connList.conns[dbName] != nil {
-			return nil
-		}
-	}
-
+func newClient(conf *Config) (*gorm.DB, error) {
 	// 解析日志级别
 	logLevel := logger.Silent
 	switch conf.LogLevel {
@@ -78,10 +52,6 @@ func newClient(dbName string, conf *Config) error {
 		logLevel = logger.Warn
 	case "info":
 		logLevel = logger.Info
-	case "silent", "":
-		logLevel = logger.Silent
-	default:
-		logLevel = logger.Silent
 	}
 
 	slowThreshold := 500 * time.Millisecond
@@ -89,15 +59,13 @@ func newClient(dbName string, conf *Config) error {
 		slowThreshold = time.Duration(conf.SlowThreshold) * time.Millisecond
 	}
 
-	var dbOne *gorm.DB
-	var err error
 	master := conf.Dsn[0]
 	slave := conf.Dsn[1:]
-	dbOne, err = gorm.Open(mysql.Open(master), &gorm.Config{
+	dbOne, err := gorm.Open(mysql.Open(master), &gorm.Config{
 		Logger: newMysqlLogger(slowThreshold, logLevel, conf.IgnoreRecordNotFoundError),
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// 配置读写分离
@@ -106,7 +74,6 @@ func newClient(dbName string, conf *Config) error {
 		Replicas: []gorm.Dialector{},
 		Policy:   dbresolver.RandomPolicy{},
 	}
-
 	// 设置从库
 	if len(slave) > 0 {
 		var replicas []gorm.Dialector
@@ -116,58 +83,45 @@ func newClient(dbName string, conf *Config) error {
 		dbResolverCfg.Replicas = replicas
 	}
 
-	dbOne.Use(
+	err = dbOne.Use(
 		dbresolver.Register(dbResolverCfg).
-			// SetConnMaxIdleTime(time.Hour).
-			SetConnMaxLifetime(time.Duration(conf.ConnMaxLife) * time.Second).
+			SetConnMaxIdleTime(time.Duration(conf.ConnMaxIdleTime) * time.Second).
+			SetConnMaxLifetime(time.Duration(conf.ConnMaxLifeTime) * time.Second).
 			SetMaxIdleConns(conf.MaxIdleConn).
 			SetMaxOpenConns(conf.MaxConn),
 	)
+	if err != nil {
+		return nil, err
+	}
 
-	connList.conns[dbName] = dbOne
-	gocommonlog.Info(context.Background(), TAG, "connect to mysql %s succ", dbName)
-
-	return nil
+	return dbOne, nil
 }
 
 // GetConn 获取数据库连接
 func GetConn(dbIns string) (*gorm.DB, error) {
-	connList.mu.RLock()
-	defer connList.mu.RUnlock()
-
-	if _, ok := connList.conns[dbIns]; !ok {
-		return nil, fmt.Errorf("mysql conn is not found")
+	if defaultManager == nil {
+		return nil, fmt.Errorf("mysql manager is not initialized")
 	}
-
-	return connList.conns[dbIns], nil
+	return defaultManager.GetConn(dbIns)
 }
 
-// Close 关闭 MySQL 连接
-func Close() map[string][]error {
-	connList.mu.Lock()
-	defer connList.mu.Unlock()
-
-	errs := make(map[string][]error)
-	for dbName, db := range connList.conns {
-		if db != nil {
-			sqlDB, err := db.DB()
-			if err != nil {
-				errs[dbName] = append(errs[dbName], fmt.Errorf("get sql.DB for mysql %s failed: %w", dbName, err))
-				gocommonlog.ErrorWithMsg(context.Background(), TAG, err.Error())
-				continue
-			}
-
-			if err := sqlDB.Close(); err != nil {
-				errs[dbName] = append(errs[dbName], fmt.Errorf("close mysql %s failed: %w", dbName, err))
-				gocommonlog.ErrorWithMsg(context.Background(), TAG, err.Error())
-			} else {
-				gocommonlog.Info(context.Background(), TAG, "close mysql %s succ", dbName)
-			}
-		}
+// Close 关闭数据库连接
+func Close() error {
+	if defaultManager == nil {
+		return fmt.Errorf("mysql manager is not initialized")
 	}
+	return defaultManager.Close()
+}
 
-	// 清空连接列表
-	connList.conns = make(map[string]*gorm.DB)
-
-	return errs
+// HealthCheck 健康检查
+func HealthCheck() map[string]*HealthStatus {
+	if defaultManager == nil {
+		status := &HealthStatus{
+			Status:    "error",
+			Error:     "mysql manager is not initialized",
+			Timestamp: time.Now().UnixMilli(),
+		}
+		return map[string]*HealthStatus{"manager": status}
+	}
+	return defaultManager.HealthCheck()
 }

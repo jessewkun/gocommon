@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jessewkun/gocommon/alarm"
 	"github.com/jessewkun/gocommon/config"
 	"github.com/jessewkun/gocommon/constant"
 )
@@ -22,13 +21,16 @@ var alarmLevelMap = map[string][]string{
 	"panic": {"panic"},
 }
 
-// SendAlarm 发送报警
-func SendAlarm(c context.Context, level string, tag string, msg string, err error) {
-	if Cfg.Closed {
-		return
+// RegisterAlerter 注册一个报警器实例，用于发送报警
+func RegisterAlerter(a Alerter) {
+	if a != nil {
+		alerter = a
 	}
+}
 
-	if Cfg.AlarmLevel == "" {
+// SendAlarm 根据配置的级别发送报警
+func SendAlarm(c context.Context, level string, tag string, msg string, err error) {
+	if Cfg.Closed || Cfg.AlarmLevel == "" {
 		return
 	}
 
@@ -37,7 +39,6 @@ func SendAlarm(c context.Context, level string, tag string, msg string, err erro
 		return
 	}
 
-	// 检查当前级别是否允许报警
 	canAlarm := false
 	for _, v := range allowedLevels {
 		if v == level {
@@ -47,15 +48,45 @@ func SendAlarm(c context.Context, level string, tag string, msg string, err erro
 	}
 
 	if canAlarm {
-		content := buildAlarmContent(c, tag, msg, err)
-		_ = alarm.SendAlarm(c, "["+config.Cfg.Mode+"] "+config.Cfg.AppName+" Alarm - "+level, content)
+		ForceSendAlarm(c, level, tag, msg, err)
 	}
 }
 
-// ForceSendAlarm 强制发送报警
+// ForceSendAlarm 强制发送报警，忽略级别配置
 func ForceSendAlarm(c context.Context, level string, tag string, msg string, err error) {
+	if alerter == nil {
+		// 如果没有注册报警器，只打印一条日志提示
+		log(c, LogEntry{
+			Level:   WarnLevel,
+			Tag:     "ALERTER_NOT_REGISTERED",
+			Message: "Alerter is not registered, unable to send alarm.",
+			Fields: map[string]interface{}{
+				"origin_level": level,
+				"origin_tag":   tag,
+				"origin_msg":   msg,
+				"origin_err":   err,
+			},
+		})
+		return
+	}
+
+	title := fmt.Sprintf("[%s] %s Alarm - %s", config.Cfg.Mode, config.Cfg.AppName, level)
 	content := buildAlarmContent(c, tag, msg, err)
-	_ = alarm.SendAlarm(c, "["+config.Cfg.Mode+"] "+config.Cfg.AppName+" Alarm - "+level, content)
+
+	if sendErr := alerter.Send(c, title, content); sendErr != nil {
+		// 报警发送失败，记录错误日志，但不再触发新的报警，避免循环
+		log(c, LogEntry{
+			Level:   ErrorLevel,
+			Tag:     "ALERTER_ERROR",
+			Message: fmt.Sprintf("Failed to send alarm via alerter: %v", sendErr),
+			Fields: map[string]interface{}{
+				"origin_level": level,
+				"origin_tag":   tag,
+				"origin_msg":   msg,
+				"origin_err":   err,
+			},
+		})
+	}
 }
 
 // buildAlarmContent 构建报警内容
@@ -83,8 +114,12 @@ func buildAlarmContent(c context.Context, tag string, msg string, err error) []s
 		content = append(content, fmt.Sprintf("【REQUEST PATH】: %v", requestPath))
 	}
 
-	if userID := c.Value(constant.CtxUserID); userID != nil {
-		content = append(content, fmt.Sprintf("【USER ID】: %v", userID))
+	if studentID := c.Value(constant.CtxStudentID); studentID != nil {
+		content = append(content, fmt.Sprintf("【STUDENT ID】: %v", studentID))
+	}
+
+	if teacherID := c.Value(constant.CtxTeacherID); teacherID != nil {
+		content = append(content, fmt.Sprintf("【TEACHER ID】: %v", teacherID))
 	}
 
 	if traceID := c.Value(constant.CtxTraceID); traceID != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -13,6 +14,11 @@ import (
 
 	"github.com/jessewkun/gocommon/logger"
 )
+
+// contains checks if a string contains a substring (case-insensitive)
+func contains(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+}
 
 const (
 	testDBInstance   = "default"
@@ -45,7 +51,32 @@ func TestMain(m *testing.M) {
 	if err := Init(); err != nil {
 		fmt.Printf("Failed to initialize MongoDB for tests: %v\n", err)
 		// Check if the error indicates a connection problem
-		if _, ok := err.(mongo.ServerError); ok || err.Error() == "server selection error: context deadline exceeded" {
+		errMsg := err.Error()
+		isConnectionError := false
+
+		// Check for various connection-related error patterns
+		connectionErrorPatterns := []string{
+			"server selection error",
+			"connection refused",
+			"no reachable servers",
+			"context deadline exceeded",
+			"timeout",
+			"dial tcp",
+		}
+
+		for _, pattern := range connectionErrorPatterns {
+			if contains(errMsg, pattern) {
+				isConnectionError = true
+				break
+			}
+		}
+
+		// Also check for mongo.ServerError type
+		if _, ok := err.(mongo.ServerError); ok {
+			isConnectionError = true
+		}
+
+		if isConnectionError {
 			fmt.Println("Skipping MongoDB tests: Cannot connect to MongoDB instance at", mongoURI)
 			os.Exit(0) // Exit gracefully, skipping tests
 		}

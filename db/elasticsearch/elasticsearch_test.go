@@ -2,130 +2,180 @@ package elasticsearch
 
 import (
 	"context"
+	"log"
 	"os"
 	"testing"
 
 	"github.com/jessewkun/gocommon/logger"
+	"github.com/stretchr/testify/assert"
 )
 
+const testIndex = "test-gocommon-index"
+
+var testClient *Client
+
+// TestMain manages setup and teardown for all tests in this package.
 func TestMain(m *testing.M) {
 	logger.Cfg.Path = "./test.log"
 	_ = logger.Init()
+
+	if err := setup(); err != nil {
+		log.Printf("skipping tests: elasticsearch setup failed: %v", err)
+		// We don't os.Exit(1) here to allow other packages' tests to run
+	}
+
 	code := m.Run()
+
+	if testClient != nil {
+		teardown()
+	}
+
 	os.Remove("./test.log")
 	os.Exit(code)
 }
 
-func TestElasticsearch_BasicFlow(t *testing.T) {
-	// 设置 ES 配置
+// setup initializes the elasticsearch client for tests.
+func setup() error {
 	Cfgs = map[string]*Config{
 		"default": {
-			Addresses: []string{"http://127.0.0.1:9200"},
-			Username:  "",
-			Password:  "",
+			Addresses:     []string{"http://127.0.0.1:9200"},
+			IsLog:         true,
+			SlowThreshold: 200,
 		},
 	}
-
-	// 初始化 ES 连接
 	if err := Init(); err != nil {
-		t.Skipf("ES连接失败，跳过测试: %v", err)
+		return err
 	}
-
-	// 获取客户端
 	client, err := GetConn("default")
 	if err != nil {
-		t.Fatalf("获取客户端失败: %v", err)
+		return err
 	}
+	testClient = client
+	return nil
+}
 
+// teardown cleans up resources after tests.
+func teardown() {
+	if testClient != nil {
+		// Use the new signature for DeleteIndex
+		_ = testClient.DeleteIndex(context.Background(), testIndex)
+	}
+	_ = Close()
+}
+
+func skipIfNoES(t *testing.T) {
+	if testClient == nil {
+		t.Skip("skipping test: elasticsearch client not initialized")
+	}
+}
+
+func TestManager(t *testing.T) {
+	skipIfNoES(t)
+	assert.NotNil(t, defaultManager)
+
+	// Test GetConn
+	c, err := GetConn("default")
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+	assert.Equal(t, testClient, c)
+
+	_, err = GetConn("nonexistent")
+	assert.Error(t, err)
+
+	// Test HealthCheck
+	health := HealthCheck()
+	assert.NotNil(t, health["default"])
+	assert.Equal(t, "success", health["default"].Status)
+}
+
+func TestClient_IndexManagement(t *testing.T) {
+	skipIfNoES(t)
 	ctx := context.Background()
 
-	// 健康检查
-	hc := client.HealthCheck()
-	if len(hc) == 0 {
-		t.Skip("健康检查失败，跳过测试")
+	// Clean up at the end
+	defer func() {
+		_ = testClient.DeleteIndex(ctx, testIndex)
+	}()
+
+	// 1. Create Index
+	mapping := map[string]any{"mappings": map[string]any{"properties": map[string]any{"name": map[string]any{"type": "text"}}}}
+	err := testClient.CreateIndex(ctx, testIndex, mapping)
+	assert.NoError(t, err)
+
+	// 2. Index Exists
+	exists, err := testClient.IndexExists(ctx, testIndex)
+	assert.NoError(t, err)
+	assert.True(t, exists)
+
+	// 3. Get Mapping
+	var mappingResult map[string]interface{}
+	err = testClient.GetIndexMapping(ctx, testIndex, &mappingResult)
+	assert.NoError(t, err)
+	assert.NotNil(t, mappingResult[testIndex]) // Check if the index key exists in the result
+
+	// 4. Delete Index
+	err = testClient.DeleteIndex(ctx, testIndex)
+	assert.NoError(t, err)
+
+	// 5. Index Should Not Exist
+	exists, err = testClient.IndexExists(ctx, testIndex)
+	assert.NoError(t, err)
+	assert.False(t, exists)
+}
+
+func TestClient_DocumentFlow(t *testing.T) {
+	skipIfNoES(t)
+	ctx := context.Background()
+
+	// Ensure index exists
+	mapping := map[string]any{"mappings": map[string]any{"properties": map[string]any{"name": map[string]any{"type": "text"}}}}
+	_ = testClient.CreateIndex(ctx, testIndex, mapping)
+
+	// Clean up at the end
+	defer func() {
+		_ = testClient.DeleteIndex(ctx, testIndex)
+	}()
+
+	type doc struct {
+		Name string `json:"name"`
 	}
 
-	// 检查是否有成功的连接
-	hasSuccess := false
-	for _, status := range hc {
-		if status.Status == "success" {
-			hasSuccess = true
-			break
-		}
-	}
-	if !hasSuccess {
-		t.Skip("没有成功的 ES 连接，跳过测试")
-	}
+	// 1. Index Document and force refresh
+	myDoc := doc{Name: "gocommon"}
+	err := testClient.Index(ctx, testIndex, "1", myDoc, "wait_for")
+	assert.NoError(t, err)
 
-	// 创建索引
-	mapping := `{"mappings":{"properties":{"title":{"type":"text"},"content":{"type":"text"}}}}`
-	err = client.CreateIndex(ctx, "test_index", mapping)
-	if err != nil {
-		t.Skipf("创建索引失败，跳过测试: %v", err)
+	// 2. Get Document
+	var docWrapper struct {
+		Source doc `json:"_source"`
 	}
+	found, err := testClient.Get(ctx, testIndex, "1", &docWrapper)
+	assert.NoError(t, err)
+	assert.True(t, found)
+	assert.Equal(t, "gocommon", docWrapper.Source.Name)
 
-	// 判断索引是否存在
-	exists, err := client.IndexExists(ctx, "test_index")
-	if err != nil {
-		t.Skipf("IndexExists 查询失败，跳过测试: %v", err)
+	// 3. Search Document
+	query := map[string]any{"query": map[string]any{"match": map[string]any{"name": "gocommon"}}}
+	var searchResult struct {
+		Hits struct {
+			Total struct {
+				Value int `json:"value"`
+			} `json:"total"`
+		} `json:"hits"`
 	}
-	if !exists {
-		t.Skip("IndexExists 应为 true，跳过测试")
-	}
+	err = testClient.Search(ctx, testIndex, query, &searchResult)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, searchResult.Hits.Total.Value)
 
-	// 获取索引 mapping
-	m, err := client.GetIndexMapping(ctx, "test_index")
-	if err != nil {
-		t.Skipf("GetIndexMapping 失败，跳过测试: %v", err)
-	}
-	if m == "" {
-		t.Skip("GetIndexMapping 返回空，跳过测试")
-	}
+	// 4. Delete Document
+	err = testClient.Delete(ctx, testIndex, "1", "wait_for")
+	assert.NoError(t, err)
 
-	// 写入文档
-	doc := `{"title":"Hello ES","content":"Elasticsearch test content"}`
-	err = client.Index(ctx, "test_index", "1", doc)
-	if err != nil {
-		t.Skipf("写入文档失败，跳过测试: %v", err)
+	// 5. Get Deleted Document (should not be found)
+	var deletedDocWrapper struct {
+		Source doc `json:"_source"`
 	}
-
-	// 查询文档
-	res, err := client.Get(ctx, "test_index", "1")
-	if err != nil {
-		t.Skipf("查询文档失败，跳过测试: %v", err)
-	}
-	if res == "" {
-		t.Skip("查询文档返回空，跳过测试")
-	}
-
-	// 搜索
-	query := `{"query":{"match":{"title":"Hello"}}}`
-	searchRes, err := client.Search(ctx, "test_index", query)
-	if err != nil {
-		t.Skipf("搜索失败，跳过测试: %v", err)
-	}
-	if searchRes == "" {
-		t.Skip("搜索结果为空，跳过测试")
-	}
-
-	// 删除文档
-	err = client.Delete(ctx, "test_index", "1")
-	if err != nil {
-		t.Skipf("删除文档失败，跳过测试: %v", err)
-	}
-
-	// 删除索引
-	err = client.DeleteIndex(ctx, "test_index")
-	if err != nil {
-		t.Skipf("删除索引失败，跳过测试: %v", err)
-	}
-
-	// 再次判断索引是否存在
-	exists, err = client.IndexExists(ctx, "test_index")
-	if err != nil {
-		t.Skipf("IndexExists 查询失败，跳过测试: %v", err)
-	}
-	if exists {
-		t.Skip("IndexExists 删除后应为 false，跳过测试")
-	}
+	found, err = testClient.Get(ctx, testIndex, "1", &deletedDocWrapper)
+	assert.NoError(t, err)
+	assert.False(t, found)
 }

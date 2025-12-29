@@ -5,95 +5,76 @@
 ## 特性
 
 -   **高性能**: 基于 BigCache，零 GC 压力，适合大容量缓存
--   **TTL 支持**: 支持设置缓存项的过期时间
--   **类型安全**: 提供泛型支持的类型安全缓存
--   **并发安全**: 使用读写锁保证并发安全
--   **统计信息**: 提供命中率、淘汰次数等统计信息
--   **缓存管理**: 支持多个命名缓存的管理
--   **自动清理**: 后台自动清理过期项
--   **JSON 序列化**: 支持复杂数据结构的序列化和反序列化
+-   **TTL 支持**: 支持设置缓存项的过期时间（详情见下方**重要注意事项**）。
+-   **类型安全**: 提供泛型支持的类型安全缓存。
+-   **并发安全**: `Get`/`Set` 等操作是并发安全的。
+-   **统计信息**: 提供命中、未命中、过期等统计信息。
+-   **缓存管理**: 支持多个命名缓存的管理。
+-   **JSON 序列化**: 支持复杂数据结构的序列化和反序列化。
+
+## 重要注意事项 (Important Caveats)
+
+在使用本模块前，请务必理解以下几点，它们源于底层 `BigCache` 的设计限制：
+
+1.  **TTL 过期项不会自动释放内存**:
+    -   当一个缓存项的 TTL 过期后，`Get` 操作会无法获取到它，但该项占用的**内存不会被立即释放**。
+    -   内存的回收依赖于 `BigCache` 自身的淘汰机制（近似 LRU）。一个过期后再也不被访问的“僵尸”数据会一直保留在内存中，直到被新数据挤出。
+    -   **结论**: 请不要依赖 TTL 作为精确的内存管理工具。
+
+2.  **`ResetStats()` 不会清空数据**:
+    -   `ResetStats()` 方法（原 `Clear()`）**只会重置缓存的统计信息**（如命中率），**不会删除缓存中的任何数据**。
+    -   `BigCache` 不支持清空操作，因此本库也无法提供此功能。
+
+3.  **无法存储 `nil` 作为有效的缓存值**:
+    -   本库使用 `nil` 作为内部标记来表示一个缓存项已被“删除”。
+    -   因此，如果您尝试使用 `Set` 方法存储一个 `nil` 值，例如 `cache.Set("key", nil)`，当您再次 `Get("key")` 时，将会得到 `(nil, false)`，表示该键不存在。
+    -   **结论**: 请避免直接存储 `nil` 值，否则它将被解释为已删除的项。
+
+4.  **序列化开销**:
+    -   为了支持 `interface{}` 和泛型结构体，本库使用 `json` 进行序列化。这个过程会产生额外的计算开销和 GC 压力，与 `BigCache` 的“零 GC”目标有一定冲突。
+    -   对于性能极其敏感的场景，建议只缓存基础类型（`string`, `[]byte`）或自行处理序列化。
+
+---
 
 ## 三种缓存接口的区别
 
-本模块提供了三种不同的缓存接口，满足不同的使用需求：
-
 ### 1. Cache 接口（基础接口）
-
-**Cache** 是基础的缓存接口，使用 `interface{}` 类型：
 
 ```go
 type Cache interface {
-    Get(key string) (interface{}, bool)                    // 返回 interface{}
-    Set(key string, value interface{}) error               // 接受 interface{}
+    Get(key string) (interface{}, bool)
+    Set(key string, value interface{}) error
     SetWithTTL(key string, value interface{}, ttl time.Duration) error
     Delete(key string) bool
-    Clear()
+    ResetStats() // 只重置统计，不清除数据
     Size() int
     Capacity() int
     Stats() Stats
     Close() error
-}
-```
-
-**特点：**
-
--   使用 `interface{}` 类型，需要类型断言
--   可以存储任意类型的数据
--   类型安全性较差，容易出现运行时错误
--   适合简单的缓存需求
-
-**使用示例：**
-
-```go
-cache, _ := NewDefaultBigCache()
-cache.Set("user", map[string]interface{}{"id": 1, "name": "张三"})
-
-// 需要类型断言
-if value, exists := cache.Get("user"); exists {
-    if user, ok := value.(map[string]interface{}); ok {
-        fmt.Println(user["name"])
-    }
 }
 ```
 
 ### 2. TypedCache 接口（类型安全接口）
 
-**TypedCache** 是类型安全的缓存接口，使用 Go 泛型：
-
 ```go
 type TypedCache[T any] interface {
-    Get(key string) (T, bool)                              // 返回具体类型 T
-    Set(key string, value T) error                         // 接受具体类型 T
+    Get(key string) (T, bool)
+    Set(key string, value T) error
     SetWithTTL(key string, value T, ttl time.Duration) error
     Delete(key string) bool
-    Clear()
+    ResetStats() // 只重置统计，不清除数据
     Size() int
     Capacity() int
     Stats() Stats
     Close() error
 }
 ```
+**特点**:
+-   与 `Cache` 接口功能对等，但提供编译时类型安全。
+-   避免了运行时类型断言的需要和风险。
 
-**特点：**
-
--   使用泛型 `T`，编译时类型安全
--   不需要类型断言
--   更好的 IDE 支持和代码提示
--   避免运行时类型错误
--   **完全保留 Stats 功能**：与 Cache 接口具有相同的统计功能
--   适合需要类型安全的场景
-
-**使用示例：**
-
+**使用示例**:
 ```go
-// 字符串类型缓存
-stringCache, _ := NewTypedBigCache[string](1000)
-stringCache.Set("greeting", "Hello")
-if value, exists := stringCache.Get("greeting"); exists {
-    fmt.Println(value) // value 是 string 类型
-}
-
-// 用户类型缓存
 type User struct {
     ID   int    `json:"id"`
     Name string `json:"name"`
@@ -102,266 +83,67 @@ type User struct {
 userCache, _ := NewTypedBigCache[User](1000)
 user := User{ID: 1, Name: "张三"}
 userCache.Set("user:1", user)
+
 if cachedUser, exists := userCache.Get("user:1"); exists {
     fmt.Println(cachedUser.Name) // cachedUser 是 User 类型
 }
-
-// TypedCache 同样支持统计功能
-stats := userCache.Stats()
-fmt.Printf("命中率: %.2f%%\n", stats.HitRate()*100)
 ```
 
 ### 3. Manager 管理器（多缓存管理）
 
-**Manager** 是缓存管理器，用于管理多个命名缓存：
+**特点**:
+-   在一个统一的对象中管理多个命名的 `Cache` 实例。
+-   每个缓存拥有独立的配置和生命周期。
 
-```go
-type Manager struct {
-    caches map[string]Cache
-    mutex  sync.RWMutex
-}
-```
-
-**特点：**
-
--   管理多个不同的缓存实例
--   每个缓存有独立的名称和配置
--   提供统一的统计和管理接口
--   支持缓存的创建、删除、查询等操作
--   适合需要管理多个缓存的场景
-
-**使用示例：**
-
+**使用示例**:
 ```go
 manager := NewManager()
+defer manager.ClearAll() // 确保所有缓存被关闭
 
-// 创建不同类型的缓存
-userCache, _ := manager.GetCache("users", 1000)      // 用户缓存
-productCache, _ := manager.GetCache("products", 500)  // 产品缓存
-sessionCache, _ := manager.GetCache("sessions", 200)  // 会话缓存
-
-// 使用不同的缓存
+// 获取通用缓存
+userCache, _ := manager.GetCache("users", 1000)
 userCache.Set("user:1", "用户数据")
-productCache.Set("product:1", "产品数据")
-sessionCache.Set("session:1", "会话数据")
 
-// 获取所有缓存统计
-allStats := manager.GetAllStats()
-for name, stats := range allStats {
-    fmt.Printf("缓存 %s: 命中率=%.2f%%\n", name, stats.HitRate()*100)
-}
-
-// 列出所有缓存
-caches := manager.ListCaches()
-fmt.Printf("所有缓存: %v\n", caches)
+// 获取类型安全的缓存 (推荐方式)
+type Product struct{ ID int, Name string }
+productCache, _ := localcache.GetTypedCache[Product](manager, "products", 500)
+productCache.Set("p:1", Product{ID: 1, Name: "电脑"})
 ```
 
 ### 接口对比表
 
-| 特性           | Cache               | TypedCache        | Manager            |
-| -------------- | ------------------- | ----------------- | ------------------ |
-| **类型安全**   | ❌ 使用 interface{} | ✅ 编译时类型安全 | ❌ 管理 Cache 接口 |
-| **类型断言**   | 需要                | 不需要            | 需要               |
-| **泛型支持**   | ❌                  | ✅                | ❌                 |
-| **统计功能**   | ✅ 完整支持         | ✅ 完整支持       | ✅ 统一管理        |
-| **多缓存管理** | ❌                  | ❌                | ✅                 |
-| **命名空间**   | ❌                  | ❌                | ✅                 |
-| **使用场景**   | 简单缓存需求        | 类型安全需求      | 多缓存管理需求     |
+| 特性           | Cache               | TypedCache        | Manager & GetTypedCache      |
+| -------------- | ------------------- | ----------------- | ---------------------------- |
+| **类型安全**   | ❌ 使用 interface{} | ✅ 编译时类型安全 | ✅ 提供泛型函数获取类型安全缓存 |
+| **类型断言**   | 需要                | 不需要            | 不需要                       |
+| **泛型支持**   | ❌                  | ✅                | ✅ (通过辅助函数)            |
+| **多缓存管理** | ❌                  | ❌                | ✅                           |
+| **使用场景**   | 简单、动态类型      | 类型强相关的业务  | 需要管理多个不同缓存的场景   |
 
 ### 选择建议
 
-1. **简单场景**：直接使用 `Cache` 接口
-
+1.  **类型安全场景 (推荐)**: 优先使用 `NewTypedBigCache` 或 `GetTypedCache`。
     ```go
-    cache, _ := NewDefaultBigCache()
-    ```
-
-2. **类型安全场景**：使用 `TypedCache`
-
-    ```go
+    // 单一缓存
     userCache, _ := NewTypedBigCache[User](1000)
+
+    // 从管理器获取
+    manager := NewManager()
+    productCache, _ := GetTypedCache[Product](manager, "products", 500)
     ```
 
-3. **多缓存管理场景**：使用 `Manager`
-
+2.  **多缓存管理**: 使用 `Manager`，并结合 `GetCache` 和 `GetTypedCache`。
     ```go
     manager := NewManager()
-    userCache, _ := manager.GetCache("users", 1000)
+    // 获取非类型安全缓存
+    sessions, _ := manager.GetCache("sessions", 1000)
+    // 获取类型安全缓存
+    users, _ := GetTypedCache[User](manager, "users", 2000)
     ```
-
-4. **组合使用**：Manager + TypedCache
-    ```go
-    // 虽然 Manager 不直接支持 TypedCache，但可以这样使用
-    manager := NewManager()
-    cache, _ := manager.GetCache("users", 1000)
-    // 然后手动进行类型转换
-    ```
-
-## 快速开始
-
-### 基本使用
-
-```go
-package main
-
-import (
-    "fmt"
-    "time"
-    "github.com/jessewkun/gocommon/db/localcache"
-)
-
-func main() {
-    // 创建默认配置的bigcache
-    cache, err := localcache.NewDefaultBigCache()
-    if err != nil {
-        panic(err)
-    }
-    defer cache.Close()
-
-    // 设置缓存
-    cache.Set("key1", "value1")
-
-    // 设置带TTL的缓存
-    cache.SetWithTTL("key2", "value2", 30*time.Minute)
-
-    // 获取缓存
-    if value, exists := cache.Get("key1"); exists {
-        fmt.Printf("获取到值: %v\n", value)
-    }
-
-    // 删除缓存
-    cache.Delete("key1")
-
-    // 获取统计信息
-    stats := cache.Stats()
-    fmt.Printf("命中率: %.2f%%\n", stats.HitRate()*100)
-}
-```
-
-### 类型安全缓存
-
-```go
-// 创建字符串类型缓存
-stringCache, err := localcache.NewTypedBigCache[string](1000)
-if err != nil {
-    panic(err)
-}
-defer stringCache.Close()
-
-// 创建用户结构体类型缓存
-type User struct {
-    ID   int    `json:"id"`
-    Name string `json:"name"`
-    Age  int    `json:"age"`
-}
-
-userCache, err := localcache.NewTypedBigCache[User](1000)
-if err != nil {
-    panic(err)
-}
-defer userCache.Close()
-
-// 使用类型安全缓存
-user := User{ID: 1, Name: "张三", Age: 25}
-userCache.Set("user:1", user)
-
-if cachedUser, exists := userCache.Get("user:1"); exists {
-    fmt.Printf("用户: %s, 年龄: %d\n", cachedUser.Name, cachedUser.Age)
-}
-
-// TypedCache 同样支持完整的统计功能
-stats := userCache.Stats()
-fmt.Printf("缓存统计: 命中=%d, 未命中=%d, 命中率=%.2f%%\n",
-    stats.Hits, stats.Misses, stats.HitRate()*100)
-```
-
-### 缓存管理器
-
-```go
-// 创建缓存管理器
-manager := localcache.NewManager()
-
-// 创建不同类型的缓存
-userCache, err := manager.GetCache("users", 1000)
-if err != nil {
-    panic(err)
-}
-
-productCache, err := manager.GetCache("products", 500)
-if err != nil {
-    panic(err)
-}
-
-// 使用缓存
-userCache.Set("user:1", "用户数据")
-productCache.Set("product:1", "产品数据")
-
-// 获取所有缓存统计信息
-allStats := manager.GetAllStats()
-for name, stats := range allStats {
-    fmt.Printf("缓存 %s: 命中率=%.2f%%\n", name, stats.HitRate()*100)
-}
-
-// 列出所有缓存
-caches := manager.ListCaches()
-fmt.Printf("所有缓存: %v\n", caches)
-```
-
-### 自定义配置
-
-```go
-// 创建自定义配置的bigcache
-config := bigcache.Config{
-    Shards:             2048,           // 分片数量
-    LifeWindow:         30 * time.Minute, // 生命周期
-    CleanWindow:        10 * time.Minute, // 清理窗口
-    MaxEntriesInWindow: 1000000,        // 最大条目数
-    MaxEntrySize:       1000,           // 最大条目大小
-    Verbose:            false,          // 不输出详细日志
-    HardMaxCacheSize:   0,              // 无硬限制
-    Logger:             nil,            // 无日志记录器
-}
-
-cache, err := localcache.NewBigCache(config)
-if err != nil {
-    panic(err)
-}
-defer cache.Close()
-```
 
 ## API 参考
 
-### Cache 接口
-
-```go
-type Cache interface {
-    Get(key string) (interface{}, bool)
-    Set(key string, value interface{}) error
-    SetWithTTL(key string, value interface{}, ttl time.Duration) error
-    Delete(key string) bool
-    Clear()
-    Size() int
-    Capacity() int
-    Stats() Stats
-    Close() error
-}
-```
-
-### TypedCache 接口
-
-```go
-type TypedCache[T any] interface {
-    Get(key string) (T, bool)
-    Set(key string, value T) error
-    SetWithTTL(key string, value T, ttl time.Duration) error
-    Delete(key string) bool
-    Clear()
-    Size() int
-    Capacity() int
-    Stats() Stats
-    Close() error
-}
-```
+(请参考代码中的接口定义)
 
 ### Stats 结构体
 
@@ -369,60 +151,19 @@ type TypedCache[T any] interface {
 type Stats struct {
     Hits        int64 `json:"hits"`        // 命中次数
     Misses      int64 `json:"misses"`      // 未命中次数
-    Evictions   int64 `json:"evictions"`   // 淘汰次数
-    Expirations int64 `json:"expirations"` // 过期次数
+    Evictions   int64 `json:"evictions"`   // 淘汰次数 (当前版本无法统计，恒为0)
+    Expirations int64 `json:"expirations"` // 过期次数 (访问过期key时计数)
 }
-
-func (s Stats) HitRate() float64 // 计算命中率
 ```
-
-## 性能特性
-
--   **零 GC 压力**: BigCache 使用内存映射，避免 GC 压力
--   **高并发**: 支持高并发读写操作
--   **内存效率**: 自动管理内存使用，避免内存泄漏
--   **快速访问**: O(1) 时间复杂度的基本操作
--   **大容量**: 支持百万级别的缓存条目
-
-## BigCache 优势
-
-1. **零 GC**: 使用内存映射，不会产生 GC 压力
-2. **高性能**: 专门为高并发场景优化
-3. **内存友好**: 自动管理内存，避免内存泄漏
-4. **大容量**: 支持存储大量数据
-5. **分片设计**: 使用分片减少锁竞争
-
-## 使用建议
-
-1. **合理设置容量**: 根据实际需求设置 `MaxEntriesInWindow`
-2. **使用 TTL**: 对于有生命周期限制的数据，建议设置合适的 TTL
-3. **监控统计**: 定期检查缓存统计信息，优化缓存策略
-4. **类型安全**: 优先使用类型安全缓存，避免类型转换错误
-5. **资源管理**: 记得调用 Close() 方法释放资源
-6. **配置优化**: 根据实际场景调整 BigCache 的配置参数
-
-## 示例
-
-更多使用示例请参考 `example.go` 文件，包含：
-
--   基本使用示例
--   类型安全缓存示例
--   缓存管理器示例
--   并发使用示例
--   TTL 使用示例
--   性能测试示例
--   自定义配置示例
 
 ## 测试
 
-运行测试：
-
+运行单元测试：
 ```bash
 go test ./db/localcache -v
 ```
 
 运行性能测试：
-
 ```bash
 go test ./db/localcache -bench=.
 ```
@@ -431,15 +172,6 @@ go test ./db/localcache -bench=.
 
 -   `github.com/allegro/bigcache` - 高性能缓存库
 -   `github.com/jessewkun/gocommon/common` - 通用错误处理
-
-## 注意事项
-
-1. **删除操作**: BigCache 本身不支持删除操作，我们通过设置空值来模拟删除
-2. **清空操作**: BigCache 不支持清空操作，我们只重置统计信息
-3. **TTL 实现**: TTL 是通过在数据中嵌入过期时间实现的，不是 BigCache 原生功能
-4. **序列化开销**: 复杂数据结构需要 JSON 序列化，会有一定的性能开销
-5. **内存使用**: BigCache 会预分配内存，实际内存使用可能超过预期
-6. **统计功能**: TypedCache 完全保留了 Cache 接口的所有统计功能，包括命中率、淘汰次数等
 
 ## 技术选型
 

@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -21,14 +22,21 @@ type Config struct {
 	MaxAge               int      `mapstructure:"max_age" json:"max_age"`                             // 文件最多保存多少天
 	MaxBackup            int      `mapstructure:"max_backup" json:"max_backup"`                       // 保留多少个备份
 	TransparentParameter []string `mapstructure:"transparent_parameter" json:"transparent_parameter"` // 透传参数，继承上下文中的参数
+	LogLevel             string   `mapstructure:"log_level" json:"log_level"`                         // 日志级别, debug 调试, info 信息, warn 警告, error 错误, fatal 严重, panic 崩溃
 	AlarmLevel           string   `mapstructure:"alarm_level" json:"alarm_level"`                     // 报警级别, warn 警告, error 错误
 }
 
 var Cfg = DefaultConfig()
+var alerter Alerter
+
+// Alerter defines the interface for an alarm sender.
+type Alerter interface {
+	Send(ctx context.Context, title string, content []string) error
+}
 
 func init() {
 	config.Register("log", Cfg)
-	config.RegisterCallback("log", Init)
+	config.RegisterCallback("log", Init, "config")
 }
 
 // Validate 验证配置是否合法

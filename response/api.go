@@ -60,26 +60,20 @@ func SuccessWs(c *gin.Context, data interface{}) ([]byte, error) {
 func Error(c *gin.Context, err error) {
 	var customErr common.CustomError
 	if !errors.As(err, &customErr) {
-		err = newDefaultError(err)
-	} else {
-		c.JSON(http.StatusOK, NewAPIResult(c, customErr.Code, customErr.Error(), struct{}{}))
-		return
+		// 如果不是自定义错误，则包装为默认的系统错误
+		customErr = newDefaultError(err)
 	}
-
-	e := err.(common.CustomError)
-	c.JSON(http.StatusOK, NewAPIResult(c, e.Code, e.Error(), struct{}{}))
+	c.JSON(http.StatusOK, NewAPIResult(c, customErr.Code, customErr.Error(), struct{}{}))
 }
 
 // ErrorWs error response for websocket
 func ErrorWs(c *gin.Context, err error) ([]byte, error) {
 	var customErr common.CustomError
 	if !errors.As(err, &customErr) {
-		err = newDefaultError(err)
-	} else {
-		return json.Marshal(NewAPIResultWs(c, customErr.Code, customErr.Error(), struct{}{}))
+		// 如果不是自定义错误，则包装为默认的系统错误
+		customErr = newDefaultError(err)
 	}
-	e := err.(common.CustomError)
-	return json.Marshal(NewAPIResultWs(c, e.Code, e.Error(), struct{}{}))
+	return json.Marshal(NewAPIResultWs(c, customErr.Code, customErr.Error(), struct{}{}))
 }
 
 // Custom 自定义返回

@@ -1,12 +1,14 @@
 package http
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/jessewkun/gocommon/config"
+	"github.com/jessewkun/gocommon/logger"
 	"github.com/spf13/viper"
 )
 
@@ -17,11 +19,15 @@ type Config struct {
 	IsLog                bool     `mapstructure:"is_log" json:"is_log"`
 }
 
-func (c *Config) Reload(v *viper.Viper) {
+// Reload 重新加载 http 配置.
+// http 模块的所有配置项都被认为是安全的，可以进行热更新.
+func (c *Config) Reload(v *viper.Viper) error {
 	if err := v.UnmarshalKey("http", c); err != nil {
-		fmt.Printf("failed to reload http config: %v\n", err)
+		logger.ErrorWithMsg(context.Background(), "HTTP", "failed to reload http config: %v", err)
+		return err
 	}
-	fmt.Printf("http config reload success, config: %+v\n", c)
+	logger.Info(context.Background(), "HTTP", "http config reload success, config: %+v", c)
+	return nil
 }
 
 var Cfg = &Config{}

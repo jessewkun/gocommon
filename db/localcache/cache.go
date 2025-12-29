@@ -2,10 +2,9 @@
 package localcache
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/allegro/bigcache"
@@ -22,8 +21,8 @@ type Cache interface {
 	SetWithTTL(key string, value interface{}, ttl time.Duration) error
 	// Delete 删除缓存
 	Delete(key string) bool
-	// Clear 清空缓存
-	Clear()
+	// ResetStats 重置统计信息。注意：此方法不会清空缓存中的数据。
+	ResetStats()
 	// Size 获取缓存大小
 	Size() int
 	// Capacity 获取缓存容量
@@ -59,12 +58,8 @@ type cacheItem struct {
 
 // BigCacheWrapper bigcache包装器
 type BigCacheWrapper struct {
-	cache         *bigcache.BigCache
-	mutex         sync.RWMutex
-	stats         Stats
-	cleanupTicker *time.Ticker
-	ctx           context.Context
-	cancel        context.CancelFunc
+	cache *bigcache.BigCache
+	stats Stats
 }
 
 // NewBigCache 创建新的bigcache缓存
@@ -74,15 +69,9 @@ func NewBigCache(config bigcache.Config) (Cache, error) {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	wrapper := &BigCacheWrapper{
-		cache:  cache,
-		ctx:    ctx,
-		cancel: cancel,
+		cache: cache,
 	}
-
-	// 启动清理过期项的goroutine
-	wrapper.startCleanup()
 
 	return wrapper, nil
 }
@@ -111,32 +100,35 @@ func NewBigCacheWithSize(maxEntriesInWindow int) (Cache, error) {
 
 // Get 获取缓存值
 func (bc *BigCacheWrapper) Get(key string) (interface{}, bool) {
-	bc.mutex.RLock()
-	defer bc.mutex.RUnlock()
-
 	data, err := bc.cache.Get(key)
 	if err != nil {
-		bc.stats.Misses++
+		atomic.AddInt64(&bc.stats.Misses, 1)
 		return nil, false
 	}
 
 	// 解析缓存项
 	var item cacheItem
 	if err := json.Unmarshal(data, &item); err != nil {
-		bc.stats.Misses++
+		atomic.AddInt64(&bc.stats.Misses, 1)
+		return nil, false
+	}
+
+	// 检查是否为被删除的项（通过Delete方法设置的标记）
+	if item.Value == nil {
+		atomic.AddInt64(&bc.stats.Misses, 1)
 		return nil, false
 	}
 
 	// 检查是否过期
 	if item.ExpireAt != nil && time.Now().After(*item.ExpireAt) {
-		bc.stats.Expirations++
-		bc.stats.Misses++
+		atomic.AddInt64(&bc.stats.Expirations, 1)
+		atomic.AddInt64(&bc.stats.Misses, 1)
 		// 异步删除过期项
 		go bc.deleteExpired(key)
 		return nil, false
 	}
 
-	bc.stats.Hits++
+	atomic.AddInt64(&bc.stats.Hits, 1)
 	return item.Value, true
 }
 
@@ -150,9 +142,6 @@ func (bc *BigCacheWrapper) SetWithTTL(key string, value interface{}, ttl time.Du
 	if key == "" {
 		return common.NewCustomError(10001, fmt.Errorf("key cannot be empty"))
 	}
-
-	bc.mutex.Lock()
-	defer bc.mutex.Unlock()
 
 	// 创建缓存项
 	item := cacheItem{
@@ -182,10 +171,7 @@ func (bc *BigCacheWrapper) SetWithTTL(key string, value interface{}, ttl time.Du
 
 // Delete 删除缓存
 func (bc *BigCacheWrapper) Delete(key string) bool {
-	bc.mutex.Lock()
-	defer bc.mutex.Unlock()
-
-	// bigcache不支持删除，我们通过设置空值来模拟删除
+	// bigcache不支持删除，我们通过设置一个value为nil的项来模拟删除
 	emptyItem := cacheItem{Value: nil}
 	data, err := json.Marshal(emptyItem)
 	if err != nil {
@@ -196,78 +182,40 @@ func (bc *BigCacheWrapper) Delete(key string) bool {
 	return err == nil
 }
 
-// Clear 清空缓存
-func (bc *BigCacheWrapper) Clear() {
-	bc.mutex.Lock()
-	defer bc.mutex.Unlock()
-
-	// bigcache不支持清空，我们重置统计信息
-	bc.stats = Stats{}
+// ResetStats 重置统计信息
+func (bc *BigCacheWrapper) ResetStats() {
+	atomic.StoreInt64(&bc.stats.Hits, 0)
+	atomic.StoreInt64(&bc.stats.Misses, 0)
+	atomic.StoreInt64(&bc.stats.Evictions, 0)
+	atomic.StoreInt64(&bc.stats.Expirations, 0)
 }
 
 // Size 获取缓存大小
 func (bc *BigCacheWrapper) Size() int {
-	bc.mutex.RLock()
-	defer bc.mutex.RUnlock()
 	return bc.cache.Len()
 }
 
 // Capacity 获取缓存容量
 func (bc *BigCacheWrapper) Capacity() int {
-	bc.mutex.RLock()
-	defer bc.mutex.RUnlock()
 	return bc.cache.Capacity()
 }
 
 // Stats 获取缓存统计信息
 func (bc *BigCacheWrapper) Stats() Stats {
-	bc.mutex.RLock()
-	defer bc.mutex.RUnlock()
-
-	// 合并bigcache的统计信息
-	bigcacheStats := bc.cache.Stats()
-	stats := bc.stats
-	stats.Hits += int64(bigcacheStats.Hits)
-	stats.Misses += int64(bigcacheStats.Misses)
-
-	return stats
+	return Stats{
+		Hits:        atomic.LoadInt64(&bc.stats.Hits),
+		Misses:      atomic.LoadInt64(&bc.stats.Misses),
+		Evictions:   0, // bigcache不直接暴露Evictions计数
+		Expirations: atomic.LoadInt64(&bc.stats.Expirations),
+	}
 }
 
 // Close 关闭缓存
 func (bc *BigCacheWrapper) Close() error {
-	bc.cancel()
-	if bc.cleanupTicker != nil {
-		bc.cleanupTicker.Stop()
-	}
 	return bc.cache.Close()
 }
 
-// deleteExpired 删除过期项
+// deleteExpired 异步删除过期项
 func (bc *BigCacheWrapper) deleteExpired(key string) {
 	bc.Delete(key)
-}
-
-// startCleanup 启动清理过期项的goroutine
-func (bc *BigCacheWrapper) startCleanup() {
-	bc.cleanupTicker = time.NewTicker(5 * time.Minute) // 每5分钟清理一次
-
-	go func() {
-		for {
-			select {
-			case <-bc.cleanupTicker.C:
-				bc.cleanupExpired()
-			case <-bc.ctx.Done():
-				return
-			}
-		}
-	}()
-}
-
-// cleanupExpired 清理过期的缓存项
-func (bc *BigCacheWrapper) cleanupExpired() {
-	// 由于bigcache的限制，我们无法遍历所有项
-	// 这里只是重置统计信息中的过期计数
-	bc.mutex.Lock()
-	bc.stats.Expirations = 0
-	bc.mutex.Unlock()
 }

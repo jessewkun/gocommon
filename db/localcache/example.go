@@ -97,44 +97,46 @@ func ExampleTypedCache() {
 func ExampleManager() {
 	// 创建缓存管理器
 	manager := NewManager()
+	defer manager.ClearAll() // 使用defer确保所有缓存最终被关闭
 
-	// 创建不同类型的缓存
+	// 1. 获取通用的、非类型安全的缓存
 	userCache, err := manager.GetCache("users", 1000)
 	if err != nil {
 		fmt.Printf("创建用户缓存失败: %v\n", err)
 		return
 	}
+	userCache.Set("user:1", "通用用户数据")
+	if val, ok := userCache.Get("user:1"); ok {
+		fmt.Printf("从通用缓存获取: %s\n", val)
+	}
 
-	productCache, err := manager.GetCache("products", 500)
+	// 2. 获取类型安全的缓存
+	type Product struct {
+		ID    int
+		Name  string
+		Price float64
+	}
+	// 使用新的泛型辅助函数
+	productCache, err := GetTypedCache[Product](manager, "products", 500)
 	if err != nil {
 		fmt.Printf("创建产品缓存失败: %v\n", err)
 		return
 	}
-
-	sessionCache, err := manager.GetCache("sessions", 200)
-	if err != nil {
-		fmt.Printf("创建会话缓存失败: %v\n", err)
-		return
+	productCache.Set("product:1", Product{ID: 1, Name: "笔记本电脑", Price: 5999.9})
+	if val, ok := productCache.Get("product:1"); ok {
+		fmt.Printf("从类型安全缓存获取: %s (价格: %.2f)\n", val.Name, val.Price)
 	}
-
-	// 使用不同的缓存
-	userCache.Set("user:1", "用户数据1")
-	productCache.Set("product:1", "产品数据1")
-	sessionCache.Set("session:1", "会话数据1")
 
 	// 获取所有缓存统计信息
 	allStats := manager.GetAllStats()
 	for name, stats := range allStats {
-		fmt.Printf("缓存 %s: 大小=%d, 命中率=%.2f%%\n",
-			name, stats.Hits+stats.Misses, stats.HitRate()*100)
+		fmt.Printf("缓存 %s: 命中=%d, 未命中=%d, 命中率=%.2f%%\n",
+			name, stats.Hits, stats.Misses, stats.HitRate()*100)
 	}
 
 	// 列出所有缓存
 	caches := manager.ListCaches()
 	fmt.Printf("所有缓存: %v\n", caches)
-
-	// 清理所有缓存
-	manager.ClearAll()
 }
 
 // ExampleConcurrentUsage 并发使用示例

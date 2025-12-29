@@ -8,10 +8,9 @@ import (
 
 // ExampleNacosUsage Nacos 使用示例
 func ExampleNacosUsage() {
-	// 1. 初始化 Nacos 配置
-	// 在真实应用中，这些配置通常来自配置文件，并通过config.Init()加载到Cfgs中
-	// 这里为了演示，我们手动设置
-	Cfgs = map[string]*Config{
+	fmt.Println("---")
+	// 1. 定义 Nacos 客户端配置 (通常来自配置文件)
+	configs := map[string]*Config{
 		"default": {
 			Host:      "localhost",
 			Port:      8848,
@@ -20,295 +19,230 @@ func ExampleNacosUsage() {
 			Username:  "",
 			Password:  "",
 			Timeout:   5000,
+			LogLevel:  "info",
+			LogDir:    "/tmp/nacos/default_log",
 		},
 		"dev": {
-			Host:      "dev-nacos.example.com",
+			Host:      "dev-nacos.example.com", // 假设这是一个实际的Nacos地址
 			Port:      8848,
 			Namespace: "dev",
 			Group:     "DEFAULT_GROUP",
 			Username:  "dev-user",
 			Password:  "dev-pass",
 			Timeout:   5000,
-		},
-		"prod": {
-			Host:      "prod-nacos.example.com",
-			Port:      8848,
-			Namespace: "prod",
-			Group:     "DEFAULT_GROUP",
-			Username:  "prod-user",
-			Password:  "prod-pass",
-			Timeout:   5000,
+			LogLevel:  "warn",
+			CacheDir:  "/tmp/nacos/dev_cache",
 		},
 	}
 
-	// 2. 初始化 Nacos 连接
-	if err := Init(); err != nil {
-		log.Fatalf("Failed to initialize Nacos: %v", err)
-	}
-	// 在示例结束时，确保关闭连接
-	defer Close()
-
-	// 3. 获取默认客户端连接
-	defaultClient, err := GetConn("default")
+	// 2. 创建并初始化 Nacos 管理器
+	// NewManager 会尝试连接所有配置的实例
+	mgr, err := NewManager(configs)
 	if err != nil {
-		log.Fatalf("Failed to get default Nacos connection: %v", err)
+		log.Printf("Failed to create Nacos Manager, some clients might not connect: %v", err)
+	}
+	// 确保在程序结束时关闭所有连接
+	defer func() {
+		if closeErr := mgr.Close(); closeErr != nil {
+			log.Printf("Error closing Nacos Manager: %v", closeErr)
+		}
+		fmt.Println("Nacos Manager closed.")
+	}()
+
+	// 3. 获取客户端连接
+	defaultClient, err := mgr.GetClient("default")
+	if err != nil {
+		log.Fatalf("Failed to get default Nacos client: %v", err)
 	}
 
-	// 4. 配置管理示例
+	devClient, err := mgr.GetClient("dev")
+	if err != nil {
+		log.Printf("Failed to get dev Nacos client: %v", err) // dev Nacos可能连接失败
+	}
+
+	// 4. 配置管理示例 (使用 defaultClient)
 	// 发布配置
-	err = defaultClient.PublishConfig("app-config.json", `{"env": "development", "debug": true, "port": 8080}`)
+	configID := "app-config.json"
+	configContent := `{"env": "development", "debug": true, "port": 8080}`
+	err = defaultClient.PublishConfig(configID, configContent)
 	if err != nil {
-		log.Printf("Failed to publish config: %v", err)
+		log.Printf("Failed to publish config '%s': %v", configID, err)
 	} else {
-		fmt.Println("Config published successfully")
+		fmt.Printf("Config '%s' published successfully\n", configID)
 	}
 
 	// 获取配置
-	content, err := defaultClient.GetConfig("app-config.json")
+	content, err := defaultClient.GetConfig(configID)
 	if err != nil {
-		log.Printf("Failed to get config: %v", err)
+		log.Printf("Failed to get config '%s': %v", configID, err)
 	} else {
-		fmt.Printf("Config content: %s\n", content)
+		fmt.Printf("Config content '%s': %s\n", configID, content)
 	}
 
 	// 监听配置变化
-	err = defaultClient.ListenConfig("app-config.json", func(namespace, group, data string) {
+	err = defaultClient.ListenConfig(configID, func(namespace, group, data string) {
 		fmt.Printf("Config changed - Namespace: %s, Group: %s, Data: %s\n", namespace, group, data)
 	})
 	if err != nil {
-		log.Printf("Failed to listen config: %v", err)
+		log.Printf("Failed to listen config '%s': %v", configID, err)
 	}
 
-	// 5. 服务注册与发现示例
-	// 注册服务
-	err = defaultClient.RegisterService("example-service", "127.0.0.1", 8080, map[string]string{
+	// 5. 服务注册与发现示例 (使用 defaultClient)
+	serviceName := "example-service"
+	serviceIP := "127.0.0.1"
+	servicePort := uint64(8080)
+	serviceMetadata := map[string]string{
 		"env":      "development",
 		"version":  "1.0.0",
 		"instance": "dev-001",
-	})
+	}
+
+	// 注册服务
+	err = defaultClient.RegisterService(serviceName, serviceIP, servicePort, serviceMetadata)
 	if err != nil {
-		log.Printf("Failed to register service: %v", err)
+		log.Printf("Failed to register service '%s': %v", serviceName, err)
 	} else {
-		fmt.Println("Service registered successfully")
+		fmt.Printf("Service '%s' registered successfully\n", serviceName)
 	}
 
 	// 获取服务实例
-	instances, err := defaultClient.GetService("example-service")
+	instances, err := defaultClient.GetService(serviceName)
 	if err != nil {
-		log.Printf("Failed to get service instances: %v", err)
+		log.Printf("Failed to get service instances for '%s': %v", serviceName, err)
 	} else {
-		fmt.Printf("Found %d service instances\n", len(instances))
+		fmt.Printf("Found %d service instances for '%s'\n", len(instances), serviceName)
 		for i, instance := range instances {
-			fmt.Printf("Instance %d: %s:%d (Healthy: %v, Weight: %.2f)\n",
-				i+1, instance.IP, instance.Port, instance.Healthy, instance.Weight)
+			fmt.Printf("  Instance %d: %s:%d (Healthy: %v)\n", i+1, instance.IP, instance.Port, instance.Healthy)
 		}
-	}
-
-	// 获取一个健康实例
-	instance, err := defaultClient.GetServiceOne("example-service")
-	if err != nil {
-		log.Printf("Failed to get one service instance: %v", err)
-	} else {
-		fmt.Printf("Selected instance: %s:%d\n", instance.IP, instance.Port)
 	}
 
 	// 订阅服务变化
-	err = defaultClient.SubscribeService("example-service", func(instances []ServiceInfo) {
-		fmt.Printf("Service instances updated, count: %d\n", len(instances))
-		for i, instance := range instances {
-			fmt.Printf("Updated instance %d: %s:%d\n", i+1, instance.IP, instance.Port)
-		}
+	err = defaultClient.SubscribeService(serviceName, func(instances []ServiceInfo) {
+		fmt.Printf("Service '%s' instances updated, count: %d\n", serviceName, len(instances))
 	})
 	if err != nil {
-		log.Printf("Failed to subscribe service: %v", err)
+		log.Printf("Failed to subscribe service '%s': %v", serviceName, err)
 	}
 
-	// 6. 多实例使用示例
-	// 使用开发环境客户端
-	devClient, err := GetConn("dev")
-	if err != nil {
-		log.Printf("Failed to get dev client: %v", err)
-	} else {
-		// 在开发环境发布配置
-		err = devClient.PublishConfig("dev-config.json", `{"env": "development", "debug": true}`)
+	// 模拟 devClient 发布配置
+	if devClient != nil {
+		devConfigID := "dev-app.json"
+		devConfigContent := `{"component": "dev-frontend", "debug": true}`
+		err = devClient.PublishConfig(devConfigID, devConfigContent)
 		if err != nil {
-			log.Printf("Failed to publish dev config: %v", err)
+			log.Printf("Failed to publish dev config '%s': %v", devConfigID, err)
 		} else {
-			fmt.Println("Dev config published successfully")
+			fmt.Printf("Dev config '%s' published successfully\n", devConfigID)
 		}
-	}
-
-	// 使用生产环境客户端
-	prodClient, err := GetConn("prod")
-	if err != nil {
-		log.Printf("Failed to get prod client: %v", err)
-	} else {
-		// 在生产环境发布配置
-		err = prodClient.PublishConfig("prod-config.json", `{"env": "production", "debug": false}`)
-		if err != nil {
-			log.Printf("Failed to publish prod config: %v", err)
-		} else {
-			fmt.Println("Prod config published successfully")
-		}
-	}
-
-	// 7. 清理资源
-	// 注销服务
-	err = defaultClient.DeregisterService("example-service", "127.0.0.1", 8080)
-	if err != nil {
-		log.Printf("Failed to deregister service: %v", err)
-	} else {
-		fmt.Println("Service deregistered successfully")
-	}
-
-	// 取消监听配置
-	err = defaultClient.CancelListenConfig("app-config.json")
-	if err != nil {
-		log.Printf("Failed to cancel listen config: %v", err)
-	}
-
-	// 删除配置
-	err = defaultClient.DeleteConfig("app-config.json")
-	if err != nil {
-		log.Printf("Failed to delete config: %v", err)
-	} else {
-		fmt.Println("Config deleted successfully")
 	}
 
 	// 等待一段时间以观察配置和服务变化
-	time.Sleep(2 * time.Second)
-}
+	fmt.Println("Waiting for 5 seconds to observe Nacos changes...")
+	time.Sleep(5 * time.Second)
 
-// ExampleMultiInstance 多实例使用示例
-func ExampleMultiInstance() {
-	// 设置多个环境配置
+	// 6. 清理资源 (使用 defaultClient)
+	// 取消监听配置
+	err = defaultClient.CancelListenConfig(configID)
+	if err != nil {
+		log.Printf("Failed to cancel listen config '%s': %v", configID, err)
+	}
+
+	// 注销服务
+	err = defaultClient.DeregisterService(serviceName, serviceIP, servicePort)
+	if err != nil {
+		log.Printf("Failed to deregister service '%s': %v", serviceName, err)
+	} else {
+		fmt.Printf("Service '%s' deregistered successfully\n", serviceName)
+	}
+
+	// 删除配置
+	err = defaultClient.DeleteConfig(configID)
+	if err != nil {
+		log.Printf("Failed to delete config '%s': %v", configID, err)
+	} else {
+		fmt.Printf("Config '%s' deleted successfully\n", configID)
+	}
+
+	if devClient != nil {
+		// 删除 devClient 发布的配置
+		devConfigID := "dev-app.json"
+		err = devClient.DeleteConfig(devConfigID)
+		if err != nil {
+			log.Printf("Failed to delete dev config '%s': %v", devConfigID, err)
+		} else {
+			fmt.Printf("Dev config '%s' deleted successfully\n", devConfigID)
+		}
+	}
+
+	fmt.Println("\n---")
+	fmt.Println("--- Nacos 全局便利层使用示例 ---")
+	// 1. 设置全局配置 (通常由 config 包自动加载)
 	Cfgs = map[string]*Config{
-		"dev": {
-			Host:      "dev-nacos.example.com",
+		"global_default": {
+			Host:      "localhost",
 			Port:      8848,
-			Namespace: "dev",
+			Namespace: "public",
 			Group:     "DEFAULT_GROUP",
-			Username:  "dev-user",
-			Password:  "dev-pass",
 			Timeout:   5000,
-		},
-		"test": {
-			Host:      "test-nacos.example.com",
-			Port:      8848,
-			Namespace: "test",
-			Group:     "DEFAULT_GROUP",
-			Username:  "test-user",
-			Password:  "test-pass",
-			Timeout:   5000,
-		},
-		"prod": {
-			Host:      "prod-nacos.example.com",
-			Port:      8848,
-			Namespace: "prod",
-			Group:     "DEFAULT_GROUP",
-			Username:  "prod-user",
-			Password:  "prod-pass",
-			Timeout:   5000,
+			LogLevel:  "debug",
 		},
 	}
 
-	// 初始化所有连接
+	// 2. 初始化全局客户端连接
+	// 此处假设 config 包未自动调用 Init(), 故手动调用
 	if err := Init(); err != nil {
-		log.Fatalf("Failed to initialize Nacos instances: %v", err)
+		log.Printf("Failed to initialize global Nacos clients: %v", err)
 	}
-	defer Close()
-
-	// 遍历所有环境进行操作
-	environments := []string{"dev", "test", "prod"}
-	for _, env := range environments {
-		client, err := GetConn(env)
-		if err != nil {
-			log.Printf("Failed to get %s client: %v", env, err)
-			continue
+	// 确保在程序结束时关闭所有连接
+	defer func() {
+		if closeErr := Close(); closeErr != nil {
+			log.Printf("Error closing global Nacos clients: %v", closeErr)
 		}
+		fmt.Println("Global Nacos clients closed.")
+	}()
 
-		// 发布环境特定配置
-		configContent := fmt.Sprintf(`{"environment": "%s", "timestamp": "%s"}`, env, time.Now().Format(time.RFC3339))
-		err = client.PublishConfig(fmt.Sprintf("%s-config.json", env), configContent)
-		if err != nil {
-			log.Printf("Failed to publish %s config: %v", env, err)
-		} else {
-			fmt.Printf("%s config published successfully\n", env)
-		}
-
-		// 注册环境特定服务
-		err = client.RegisterService(fmt.Sprintf("%s-service", env), "127.0.0.1", 8080, map[string]string{
-			"environment": env,
-			"version":     "1.0.0",
-			"instance":    fmt.Sprintf("%s-001", env),
-		})
-		if err != nil {
-			log.Printf("Failed to register %s service: %v", env, err)
-		} else {
-			fmt.Printf("%s service registered successfully\n", env)
-		}
+	// 3. 获取客户端 (注意使用 GetClient 而非 GetConn)
+	globalClient, err := GetClient("global_default")
+	if err != nil {
+		log.Fatalf("Failed to get global_default Nacos client: %v", err)
 	}
 
-	// 验证配置和服务
-	for _, env := range environments {
-		client, err := GetConn(env)
-		if err != nil {
-			continue
-		}
-
-		// 获取配置
-		content, err := client.GetConfig(fmt.Sprintf("%s-config.json", env))
-		if err != nil {
-			log.Printf("Failed to get %s config: %v", env, err)
-		} else {
-			fmt.Printf("%s config: %s\n", env, content)
-		}
-
-		// 获取服务实例
-		instances, err := client.GetService(fmt.Sprintf("%s-service", env))
-		if err != nil {
-			log.Printf("Failed to get %s service: %v", env, err)
-		} else {
-			fmt.Printf("%s service instances: %d\n", env, len(instances))
-		}
+	// 4. 使用全局客户端
+	globalConfigID := "global-app-config.json"
+	globalConfigContent := `{"global_env": "production"}`
+	err = globalClient.PublishConfig(globalConfigID, globalConfigContent)
+	if err != nil {
+		log.Printf("Failed to publish global config '%s': %v", globalConfigID, err)
+	} else {
+		fmt.Printf("Global config '%s' published successfully\n", globalConfigID)
 	}
+
+	globalContent, err := globalClient.GetConfig(globalConfigID)
+	if err != nil {
+		log.Printf("Failed to get global config '%s': %v", globalConfigID, err)
+	} else {
+		fmt.Printf("Global config content '%s': %s\n", globalConfigID, globalContent)
+	}
+
+	// 清理全局客户端发布的配置
+	err = globalClient.DeleteConfig(globalConfigID)
+	if err != nil {
+		log.Printf("Failed to delete global config '%s': %v", globalConfigID, err)
+	} else {
+		fmt.Printf("Global config '%s' deleted successfully\n", globalConfigID)
+	}
+
+	fmt.Println("All Nacos examples completed.")
 }
 
-// ExampleConfigBased 基于配置文件的使用示例
+// ExampleMultiInstance 多实例使用示例 (已集成到 ExampleNacosUsage 中，此函数不再需要)
+func ExampleMultiInstance() {
+	fmt.Println("ExampleMultiInstance functionality is now demonstrated within ExampleNacosUsage.")
+	fmt.Println("Please refer to ExampleNacosUsage for multi-instance demonstrations.")
+}
+
+// ExampleConfigBased 基于配置文件的使用示例 (已集成到 ExampleNacosUsage 中，此函数不再需要)
 func ExampleConfigBased() {
-	// 这个示例展示了如何通过配置文件来管理多个 Nacos 实例
-	// 配置文件示例 (config.toml):
-	/*
-		[nacos]
-		[nacos.default]
-		host = "localhost"
-		port = 8848
-		namespace = "public"
-		group = "DEFAULT_GROUP"
-		timeout = 5000
-
-		[nacos.dev]
-		host = "dev-nacos.example.com"
-		port = 8848
-		namespace = "dev"
-		group = "DEFAULT_GROUP"
-		username = "dev-user"
-		password = "dev-pass"
-		timeout = 5000
-
-		[nacos.prod]
-		host = "prod-nacos.example.com"
-		port = 8848
-		namespace = "prod"
-		group = "DEFAULT_GROUP"
-		username = "prod-user"
-		password = "prod-pass"
-		timeout = 5000
-	*/
-
-	// 在真实应用中，配置会通过 config.Init() 自动加载到 Cfgs 中
-	// 然后调用 Init() 初始化所有连接
-
-	fmt.Println("This example demonstrates how to use Nacos with configuration files")
-	fmt.Println("The configuration will be automatically loaded and initialized")
+	fmt.Println("ExampleConfigBased functionality is now demonstrated within ExampleNacosUsage.")
+	fmt.Println("Configuration loading from file is typically handled by the 'config' package during application startup.")
 }

@@ -4,43 +4,18 @@ package redis
 import (
 	"context"
 	"errors"
-	"fmt"
-	"sync"
 	"time"
-
-	"github.com/jessewkun/gocommon/logger"
-	"github.com/jessewkun/gocommon/utils"
 
 	"github.com/go-redis/redis/v8"
 )
 
 const TAG = "REDIS"
 
-type Connections struct {
-	mu    sync.RWMutex
-	conns map[string]map[string]*redis.Client
-}
-
-var connList = &Connections{
-	conns: make(map[string]map[string]*redis.Client),
-}
-
-// Init 初始化redis，使用模块内注册的Cfgs
+// Init 初始化 defaultManager
 func Init() error {
-	var initErr error
-	for dbName, conf := range Cfgs {
-		if err := setDefaultConfig(conf); err != nil {
-			initErr = fmt.Errorf("redis %s setDefaultConfig error: %w", dbName, err)
-			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
-			break
-		}
-		if err := newClient(dbName, conf); err != nil {
-			initErr = fmt.Errorf("connect to redis %s error: %w", dbName, err)
-			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
-			break
-		}
-	}
-	return initErr
+	var err error
+	defaultManager, err = NewManager(Cfgs)
+	return err
 }
 
 // setDefaultConfig 设置默认配置
@@ -49,10 +24,10 @@ func setDefaultConfig(conf *Config) error {
 		return errors.New("redis addrs is empty")
 	}
 	if conf.PoolSize == 0 {
-		conf.PoolSize = 500
+		conf.PoolSize = 100
 	}
 	if conf.IdleTimeout == 0 {
-		conf.IdleTimeout = 1
+		conf.IdleTimeout = 300 // 5 minutes
 	}
 	if conf.IdleCheckFrequency == 0 {
 		conf.IdleCheckFrequency = 10
@@ -73,21 +48,26 @@ func setDefaultConfig(conf *Config) error {
 	return nil
 }
 
-// newClient 连接 redis
-func newClient(dbName string, conf *Config) error {
-	connList.mu.Lock()
-	defer connList.mu.Unlock()
+// newClient 根据配置连接 redis，返回一个通用客户端
+func newClient(conf *Config) (redis.UniversalClient, error) {
+	var client redis.UniversalClient
 
-	if _, ok := connList.conns[dbName]; ok {
-		if connList.conns[dbName] != nil {
-			return nil
-		}
-	}
-
-	connList.conns[dbName] = make(map[string]*redis.Client, 0)
-	for _, addr := range conf.Addrs {
-		client := redis.NewClient(&redis.Options{
-			Addr:               addr,
+	if conf.IsCluster {
+		// 集群模式
+		client = redis.NewClusterClient(&redis.ClusterOptions{
+			Addrs:              conf.Addrs,
+			Password:           conf.Password,
+			PoolSize:           conf.PoolSize,
+			IdleTimeout:        time.Duration(conf.IdleTimeout) * time.Second,
+			IdleCheckFrequency: time.Duration(conf.IdleCheckFrequency) * time.Second,
+			MinIdleConns:       conf.MinIdleConns,
+			MaxRetries:         conf.MaxRetries,
+			DialTimeout:        time.Duration(conf.DialTimeout) * time.Second,
+		})
+	} else {
+		// 单点模式
+		client = redis.NewClient(&redis.Options{
+			Addr:               conf.Addrs[0], // 单点模式只取第一个地址
 			Password:           conf.Password,
 			DB:                 conf.Db,
 			PoolSize:           conf.PoolSize,
@@ -97,62 +77,45 @@ func newClient(dbName string, conf *Config) error {
 			MaxRetries:         conf.MaxRetries,
 			DialTimeout:        time.Duration(conf.DialTimeout) * time.Second,
 		})
-		if conf.IsLog {
-			client.AddHook(newRedisHook(time.Duration(conf.SlowThreshold) * time.Millisecond))
-		}
-		connList.conns[dbName][addr] = client
-		logger.Info(context.Background(), TAG, "connect to redis %s addr %s succ", dbName, addr)
 	}
-	return nil
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(conf.DialTimeout)*time.Second)
+	defer cancel()
+
+	err := client.Ping(ctx).Err()
+
+	if conf.IsLog {
+		client.AddHook(newRedisHook(time.Duration(conf.SlowThreshold) * time.Millisecond))
+	}
+
+	return client, err
 }
 
 // GetConn 获得redis连接
-func GetConn(dbIns string) (*redis.Client, error) {
-	connList.mu.RLock()
-	defer connList.mu.RUnlock()
-
-	if len(connList.conns) < 1 {
-		return nil, errors.New("redis connList is empty")
+func GetConn(dbIns string) (redis.UniversalClient, error) {
+	if defaultManager == nil {
+		return nil, errors.New("redis manager is not initialized")
 	}
-
-	conns, ok := connList.conns[dbIns]
-	if !ok {
-		return nil, errors.New("redis conn is not found")
-	}
-
-	keys := make([]string, 0, len(conns))
-	for key := range conns {
-		keys = append(keys, key)
-	}
-	if len(keys) == 0 {
-		return nil, errors.New("redis conn is empty")
-	}
-
-	randomKey := keys[utils.RandomNum(0, len(keys)-1)]
-	return conns[randomKey], nil
+	return defaultManager.GetConn(dbIns)
 }
 
 // Close 关闭 Redis 连接
 func Close() error {
-	connList.mu.Lock()
-	defer connList.mu.Unlock()
-
-	var lastErr error
-	for dbName, conns := range connList.conns {
-		for addr, conn := range conns {
-			if conn != nil {
-				if err := conn.Close(); err != nil {
-					lastErr = fmt.Errorf("close redis %s addr %s failed: %w", dbName, addr, err)
-					logger.ErrorWithMsg(context.Background(), TAG, lastErr.Error())
-				} else {
-					logger.Info(context.Background(), TAG, "close redis %s addr %s succ", dbName, addr)
-				}
-			}
-		}
+	if defaultManager == nil {
+		return errors.New("redis manager is not initialized")
 	}
+	return defaultManager.Close()
+}
 
-	// 清空连接列表
-	connList.conns = make(map[string]map[string]*redis.Client)
-
-	return lastErr
+// HealthCheck redis健康检查
+func HealthCheck() map[string]*HealthStatus {
+	if defaultManager == nil {
+		status := &HealthStatus{
+			Status:    "error",
+			Error:     "redis manager is not initialized",
+			Timestamp: time.Now().UnixMilli(),
+		}
+		return map[string]*HealthStatus{"manager": status}
+	}
+	return defaultManager.HealthCheck()
 }

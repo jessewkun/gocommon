@@ -133,8 +133,8 @@ func IOLog(config *IOLogConfig) gin.HandlerFunc {
 		switch {
 		case status >= http.StatusInternalServerError:
 			logFunc = logger.ErrorWithField
-		case status >= http.StatusBadRequest:
-			logFunc = logger.WarnWithField
+		// case status >= http.StatusBadRequest:
+		// 	logFunc = logger.WarnWithField
 		default:
 			logFunc = logger.InfoWithField
 		}

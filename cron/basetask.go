@@ -5,51 +5,46 @@ import (
 	"time"
 )
 
-// BaseTask 定时任务基类
+// BaseTask 定时任务基类，提供通用方法的默认实现
 type BaseTask struct {
-	TaskName    string        // 任务名称
-	TaskDesc    string        // 任务描述
-	TaskEnabled bool          // 任务是否启用
-	TaskSpec    string        // 任务调度表达式
-	TaskTimeout time.Duration // 任务超时时间
 }
 
-// Name 获取任务名称
-func (t *BaseTask) Name() string {
-	return t.TaskName
+// Key 获取任务标识
+func (t *BaseTask) Key() string {
+	return ""
 }
 
 // Desc 获取任务描述
 func (t *BaseTask) Desc() string {
-	return t.TaskDesc
+	return ""
 }
 
-// Spec 获取任务调度表达式
+// Spec 默认实现，实际值由 ConfigurableTask 提供
 func (t *BaseTask) Spec() string {
-	return t.TaskSpec
+	return ""
 }
 
-// Enabled 获取是否启用
+// Enabled 默认实现，实际值由 ConfigurableTask 提供
 func (t *BaseTask) Enabled() bool {
-	return t.TaskEnabled
+	return false
 }
 
-// Timeout 获取任务超时时间
+// Timeout 默认实现，实际值由 ConfigurableTask 提供
 func (t *BaseTask) Timeout() time.Duration {
-	return t.TaskTimeout
+	return 0
 }
 
-// BeforeRun 任务执行前
+// BeforeRun 任务执行前，提供默认空实现
 func (t *BaseTask) BeforeRun(ctx context.Context) error {
 	return nil
 }
 
-// Run 执行任务
+// Run 执行任务，提供默认空实现
 func (t *BaseTask) Run(ctx context.Context) error {
 	return nil
 }
 
-// AfterRun 任务执行后
+// AfterRun 任务执行后，提供默认空实现
 func (t *BaseTask) AfterRun(ctx context.Context) error {
 	return nil
 }

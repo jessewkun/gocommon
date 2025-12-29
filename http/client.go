@@ -50,7 +50,6 @@ func NewClient(opt Option) *Client {
 		client.OnAfterResponse(func(c *resty.Client, r *resty.Response) error {
 			ctx := r.Request.Context()
 			logger.InfoWithField(ctx, TAG, "client request", map[string]interface{}{
-				"client":    c,
 				"url":       r.Request.URL,
 				"respData":  r,
 				"traceInfo": r.Request.TraceInfo(),

@@ -2,72 +2,44 @@
 package elasticsearch
 
 import (
-	"context"
-	"fmt"
-	"sync"
-
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/jessewkun/gocommon/logger"
+	"errors"
+	"time"
 )
 
 const TAG = "ELASTICSEARCH"
 
-type Connections struct {
-	mu    sync.RWMutex
-	conns map[string]*Client
-}
-
-var connList = &Connections{
-	conns: make(map[string]*Client),
-}
-
+// Init 初始化 defaultManager
 func Init() error {
-	var initErr error
-	for dbName, conf := range Cfgs {
-		if err := newClient(dbName, conf); err != nil {
-			initErr = fmt.Errorf("connect to elasticsearch %s faild, error: %w", dbName, err)
-			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
-			break
-		}
-	}
-	return initErr
+	var err error
+	defaultManager, err = NewManager(Cfgs)
+	return err
 }
 
 // GetConn 获取指定名称的 ES 客户端
 func GetConn(dbName string) (*Client, error) {
-	connList.mu.RLock()
-	defer connList.mu.RUnlock()
-
-	if client, ok := connList.conns[dbName]; ok && client != nil {
-		return client, nil
+	if defaultManager == nil {
+		return nil, errors.New("elasticsearch manager is not initialized")
 	}
-
-	return nil, fmt.Errorf("elasticsearch client '%s' not found", dbName)
+	return defaultManager.GetConn(dbName)
 }
 
-// newClient 创建新的 ES 客户端
-func newClient(dbName string, cfg *Config) error {
-	connList.mu.Lock()
-	defer connList.mu.Unlock()
+// Close 关闭所有 ES 连接
+func Close() error {
+	if defaultManager == nil {
+		return errors.New("elasticsearch manager is not initialized")
+	}
+	return defaultManager.Close()
+}
 
-	if _, ok := connList.conns[dbName]; ok {
-		if connList.conns[dbName] != nil {
-			return nil
+// HealthCheck ES健康检查
+func HealthCheck() map[string]*HealthStatus {
+	if defaultManager == nil {
+		status := &HealthStatus{
+			Status:    "error",
+			Error:     "elasticsearch manager is not initialized",
+			Timestamp: time.Now().UnixMilli(),
 		}
+		return map[string]*HealthStatus{"manager": status}
 	}
-
-	esCfg := elasticsearch.Config{
-		Addresses: cfg.Addresses,
-		Username:  cfg.Username,
-		Password:  cfg.Password,
-	}
-	es, err := elasticsearch.NewClient(esCfg)
-	if err != nil {
-		return err
-	}
-
-	connList.conns[dbName] = &Client{ES: es}
-	logger.Info(context.Background(), TAG, "connect to elasticsearch %s succ", dbName)
-
-	return nil
+	return defaultManager.HealthCheck()
 }

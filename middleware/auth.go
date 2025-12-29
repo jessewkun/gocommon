@@ -12,16 +12,16 @@ import (
 // 下边的 CheckLogin 中间件仅仅是一个容器，具体的登录态检查逻辑需要在业务中实现该签名
 // 登录态在不同的业务中可能保存的信息不同，比如有的业务保存的是用户id，有的业务保存的是用户名，有的业务保存的是用户信息
 // 强烈建议保存 user_id 到 gin.Context 中，方便后续使用
-type CheckLoginFunc func(c *gin.Context) error
+type CheckLoginFunc func(c *gin.Context, role string) error
 
 // NeedLoginFunc 下边的 NeedLogin 中间件仅仅是一个容器，具体的登录态检查逻辑需要在业务中实现该签名
 // 同上
-type NeedLoginFunc func(c *gin.Context)
+type NeedLoginFunc func(c *gin.Context, role string)
 
 // CheckLogin 检查登录态
-func CheckLogin(fun CheckLoginFunc) gin.HandlerFunc {
+func CheckLogin(fun CheckLoginFunc, role string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := fun(c); err != nil {
+		if err := fun(c, role); err != nil {
 			response.Error(c, common.NewCustomError(10001, err))
 			c.Abort()
 			return
@@ -31,9 +31,9 @@ func CheckLogin(fun CheckLoginFunc) gin.HandlerFunc {
 }
 
 // NeedLogin 需要登录态
-func NeedLogin(fun NeedLoginFunc) gin.HandlerFunc {
+func NeedLogin(fun NeedLoginFunc, role string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		fun(c)
+		fun(c, role)
 		c.Next()
 	}
 }

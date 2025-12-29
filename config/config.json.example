@@ -1,7 +1,7 @@
 {
     "mode": "debug",
     "port": ":8000",
-    "app_name": "service",
+    "app_name": "Service",
     "domain": "http://localhost:8000",
     "log": {
         "path": "./logs/app.log",
@@ -48,7 +48,8 @@
             ],
             "max_conn": 100,
             "max_idle_conn": 25,
-            "conn_max_life": 3600,
+            "conn_max_life_time": 3600,
+            "conn_max_idle_time": 600,
             "slow_threshold": 500,
             "ignore_record_not_found_error": true,
             "log_level": "info"
@@ -60,7 +61,8 @@
             ],
             "max_conn": 50,
             "max_idle_conn": 10,
-            "conn_max_life": 3600,
+            "conn_max_life_time": 3600,
+            "conn_max_idle_time": 600,
             "slow_threshold": 1000,
             "ignore_record_not_found_error": true,
             "log_level": "info"
@@ -140,7 +142,9 @@
                 "http://localhost:9200"
             ],
             "username": "",
-            "password": ""
+            "password": "",
+            "is_log": true,
+            "slow_threshold": 1000
         },
         "cluster": {
             "addresses": [
@@ -149,7 +153,9 @@
                 "http://localhost:9202"
             ],
             "username": "elastic",
-            "password": "password"
+            "password": "password",
+            "is_log": true,
+            "slow_threshold": 1000
         }
     },
     "nacos": {
@@ -160,7 +166,10 @@
             "group": "DEFAULT_GROUP",
             "username": "",
             "password": "",
-            "timeout": 5000
+            "not_load_cache_at_start": true,
+            "log_dir": "/tmp/nacos/log",
+            "cache_dir": "/tmp/nacos/cache",
+            "log_level": "warn"
         },
         "production": {
             "host": "nacos.example.com",
@@ -169,7 +178,31 @@
             "group": "DEFAULT_GROUP",
             "username": "nacos",
             "password": "nacos",
-            "timeout": 10000
+            "timeout": 10000,
+            "not_load_cache_at_start": true,
+            "log_dir": "/tmp/nacos/log",
+            "cache_dir": "/tmp/nacos/cache",
+            "log_level": "warn"
         }
+    },
+    "cron": {
+        "example": [
+            {
+                "key": "example",
+                "desc": "example",
+                "spec": "0 * * * * *",
+                "enabled": true,
+                "timeout": "10m"
+            }
+        ]
+    },
+    "oss": {
+        "bucket": "localhost:9000",
+        "endpoint": "localhost",
+        "region_endpoint": "localhost",
+        "access_key": "",
+        "secret_key": "",
+        "role_arn": "",
+        "region": ""
     }
 }

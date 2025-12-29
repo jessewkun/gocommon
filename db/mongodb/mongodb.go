@@ -3,174 +3,149 @@ package mongodb
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/jessewkun/gocommon/logger"
-
+	"go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 )
 
 const TAG = "MONGODB"
 
-type Connections struct {
-	mu    sync.RWMutex
-	conns map[string]*mongo.Client
-}
+var defaultManager *Manager
 
-var connList = &Connections{
-	conns: make(map[string]*mongo.Client),
-}
-
-// Init 初始化 MongoDB 连接
+// Init 初始化 defaultManager
 func Init() error {
-	var initErr error
-	for dbName, conf := range Cfgs {
-		err := setMongoDefaultConfig(conf)
-		if err != nil {
-			initErr = fmt.Errorf("mongodb %s setDefaultConfig error: %w", dbName, err)
-			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
-			break
-		}
-		if err := newClient(dbName, conf); err != nil {
-			initErr = fmt.Errorf("connect to mongodb %s failed, error: %w", dbName, err)
-			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
-			break
-		}
-	}
-	return initErr
+	var err error
+	defaultManager, err = NewManager(Cfgs)
+	return err
 }
 
 // setMongoDefaultConfig 设置 MongoDB 默认配置
 func setMongoDefaultConfig(conf *Config) error {
-	if len(conf.Uris) < 1 {
-		return fmt.Errorf("mongodb uris is invalid")
+	if len(conf.Uris) == 0 {
+		return fmt.Errorf("mongodb uris is empty")
 	}
-
-	if conf.MaxPoolSize == 0 {
+	if conf.MaxPoolSize <= 0 {
 		conf.MaxPoolSize = 100
 	}
-
-	if conf.MinPoolSize == 0 {
+	if conf.MinPoolSize <= 0 {
 		conf.MinPoolSize = 5
 	}
-
-	if conf.MaxConnIdleTime == 0 {
+	if conf.MaxConnIdleTime <= 0 {
 		conf.MaxConnIdleTime = 300
 	}
-
-	if conf.ConnectTimeout == 0 {
+	if conf.ConnectTimeout <= 0 {
 		conf.ConnectTimeout = 10
 	}
-
-	if conf.ServerSelectionTimeout == 0 {
+	if conf.ServerSelectionTimeout <= 0 {
 		conf.ServerSelectionTimeout = 5
 	}
-
-	if conf.SocketTimeout == 0 {
+	if conf.SocketTimeout <= 0 {
 		conf.SocketTimeout = 30
 	}
-
+	if conf.SlowThreshold <= 0 {
+		conf.SlowThreshold = 500
+	}
 	return nil
 }
 
 // newClient 连接 MongoDB
-func newClient(dbName string, conf *Config) error {
-	connList.mu.Lock()
-	defer connList.mu.Unlock()
+func newClient(conf *Config) (*mongo.Client, error) {
+	clientOptions := options.Client().ApplyURI(conf.Uris[0])
 
-	if _, ok := connList.conns[dbName]; ok {
-		if connList.conns[dbName] != nil {
-			return nil
-		}
-	}
-
-	// 构建连接选项
-	clientOptions := options.Client()
-
-	// 设置连接字符串
-	clientOptions.ApplyURI(conf.Uris[0])
-
-	// 设置连接池配置
+	// 连接池配置
 	clientOptions.SetMaxPoolSize(uint64(conf.MaxPoolSize))
 	clientOptions.SetMinPoolSize(uint64(conf.MinPoolSize))
 	clientOptions.SetMaxConnIdleTime(time.Duration(conf.MaxConnIdleTime) * time.Second)
 
-	// 设置超时配置
+	// 超时配置
 	clientOptions.SetConnectTimeout(time.Duration(conf.ConnectTimeout) * time.Second)
 	clientOptions.SetServerSelectionTimeout(time.Duration(conf.ServerSelectionTimeout) * time.Second)
 	clientOptions.SetSocketTimeout(time.Duration(conf.SocketTimeout) * time.Second)
 
-	// 设置读取偏好
-	if conf.ReadPreference != "" {
-		switch conf.ReadPreference {
-		case "primary":
-			clientOptions.SetReadPreference(readpref.Primary())
-		case "primaryPreferred":
-			clientOptions.SetReadPreference(readpref.PrimaryPreferred())
-		case "secondary":
-			clientOptions.SetReadPreference(readpref.Secondary())
-		case "secondaryPreferred":
-			clientOptions.SetReadPreference(readpref.SecondaryPreferred())
-		case "nearest":
-			clientOptions.SetReadPreference(readpref.Nearest())
-		default:
-			clientOptions.SetReadPreference(readpref.Primary())
-		}
-	} else {
-		clientOptions.SetReadPreference(readpref.Primary())
+	// 读写配置
+	setReadPreference(clientOptions, conf.ReadPreference)
+	setWriteConcern(clientOptions, conf.WriteConcern)
+
+	// 注册监控钩子
+	if conf.IsLog {
+		monitor := newCommandMonitor(time.Duration(conf.SlowThreshold) * time.Millisecond)
+		clientOptions.SetMonitor(&event.CommandMonitor{
+			Started:   monitor.Started,
+			Succeeded: monitor.Succeeded,
+			Failed:    monitor.Failed,
+		})
 	}
 
-	// 设置写入关注
-	if conf.WriteConcern != "" {
-		switch conf.WriteConcern {
-		case "majority":
-			clientOptions.SetWriteConcern(writeconcern.Majority())
-		case "1":
-			clientOptions.SetWriteConcern(writeconcern.W1())
-		case "0":
-			clientOptions.SetWriteConcern(writeconcern.Unacknowledged())
-		default:
-			clientOptions.SetWriteConcern(writeconcern.Majority())
-		}
-	} else {
-		clientOptions.SetWriteConcern(writeconcern.Majority())
-	}
-
-	// 创建客户端
-	client, err := mongo.Connect(context.Background(), clientOptions)
-	if err != nil {
-		return err
-	}
-
-	// 测试连接
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(conf.ConnectTimeout)*time.Second)
 	defer cancel()
 
-	if err := client.Ping(ctx, readpref.Primary()); err != nil {
-		return fmt.Errorf("failed to ping mongodb: %w", err)
+	client, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		return nil, err
 	}
 
-	connList.conns[dbName] = client
-	logger.Info(context.Background(), TAG, "connect to mongodb %s succ", dbName)
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), time.Duration(conf.ServerSelectionTimeout)*time.Second)
+	defer pingCancel()
 
-	return nil
+	if err := client.Ping(pingCtx, readpref.Primary()); err != nil {
+		return nil, fmt.Errorf("failed to ping mongodb: %w", err)
+	}
+
+	return client, nil
+}
+
+// ... (helper functions for read/write concern)
+func setReadPreference(opts *options.ClientOptions, rp string) {
+	var pref *readpref.ReadPref
+	var err error
+	switch rp {
+	case "primary":
+		pref = readpref.Primary()
+	case "primaryPreferred":
+		pref = readpref.PrimaryPreferred()
+	case "secondary":
+		pref = readpref.Secondary()
+	case "secondaryPreferred":
+		pref = readpref.SecondaryPreferred()
+	case "nearest":
+		pref = readpref.Nearest()
+	default:
+		pref = readpref.Primary()
+	}
+	if err == nil {
+		opts.SetReadPreference(pref)
+	}
+}
+
+func setWriteConcern(opts *options.ClientOptions, wc string) {
+	var concern *writeconcern.WriteConcern
+	switch wc {
+	case "majority":
+		concern = writeconcern.Majority()
+	case "1":
+		concern = writeconcern.W1()
+	case "0":
+		concern = writeconcern.Unacknowledged()
+	default:
+		concern = writeconcern.Majority()
+	}
+	opts.SetWriteConcern(concern)
 }
 
 // GetConn 获取 MongoDB 客户端
 func GetConn(dbIns string) (*mongo.Client, error) {
-	connList.mu.RLock()
-	defer connList.mu.RUnlock()
-
-	if _, ok := connList.conns[dbIns]; !ok {
-		return nil, fmt.Errorf("mongodb client is not found")
+	if defaultManager == nil {
+		return nil, errors.New("mongodb manager is not initialized")
 	}
-
-	return connList.conns[dbIns], nil
+	return defaultManager.GetConn(dbIns)
 }
 
 // GetDatabase 获取 MongoDB 数据库实例
@@ -179,7 +154,6 @@ func GetDatabase(dbIns, databaseName string) (*mongo.Database, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return client.Database(databaseName), nil
 }
 
@@ -189,31 +163,54 @@ func GetCollection(dbIns, databaseName, collectionName string) (*mongo.Collectio
 	if err != nil {
 		return nil, err
 	}
-
 	return database.Collection(collectionName), nil
 }
 
 // Close 关闭 MongoDB 连接
 func Close() error {
-	connList.mu.Lock()
-	defer connList.mu.Unlock()
-
-	var lastErr error
-	for dbName, client := range connList.conns {
-		if client != nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			if err := client.Disconnect(ctx); err != nil {
-				lastErr = fmt.Errorf("disconnect mongodb %s failed: %w", dbName, err)
-				logger.ErrorWithMsg(context.Background(), TAG, lastErr.Error())
-			} else {
-				logger.Info(context.Background(), TAG, "disconnect mongodb %s succ", dbName)
-			}
-			cancel()
-		}
+	if defaultManager == nil {
+		return errors.New("mongodb manager is not initialized")
 	}
+	return defaultManager.Close()
+}
 
-	// 清空连接列表
-	connList.conns = make(map[string]*mongo.Client)
+// HealthCheck MongoDB 健康检查
+func HealthCheck() map[string]*HealthStatus {
+	if defaultManager == nil {
+		status := &HealthStatus{
+			Status:    "error",
+			Error:     "mongodb manager is not initialized",
+			Timestamp: time.Now().UnixMilli(),
+		}
+		return map[string]*HealthStatus{"manager": status}
+	}
+	return defaultManager.HealthCheck()
+}
 
-	return lastErr
+// WithTransaction 使用事务执行操作
+func WithTransaction(client *mongo.Client, fn func(mongo.SessionContext) error) error {
+	session, err := client.StartSession()
+	if err != nil {
+		return err
+	}
+	defer session.EndSession(context.Background())
+
+	// 事务超时建议从配置中读取或作为参数传入
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	return mongo.WithSession(ctx, session, func(sessCtx mongo.SessionContext) error {
+		if err = sessCtx.StartTransaction(options.Transaction().SetReadConcern(readconcern.Snapshot())); err != nil {
+			return err
+		}
+		if err = fn(sessCtx); err != nil {
+			// If the operation fails, abort the transaction but return the original error.
+			// The abort error is logged if it occurs but not returned to the caller.
+			if abortErr := sessCtx.AbortTransaction(sessCtx); abortErr != nil {
+				logger.ErrorWithMsg(sessCtx, TAG, "failed to abort transaction: %v", abortErr)
+			}
+			return err
+		}
+		return sessCtx.CommitTransaction(sessCtx)
+	})
 }

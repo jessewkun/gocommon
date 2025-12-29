@@ -12,6 +12,7 @@ type Config struct {
 	SocketTimeout          int      `mapstructure:"socket_timeout" json:"socket_timeout"`                     // Socket超时时间，单位秒，默认30秒
 	ReadPreference         string   `mapstructure:"read_preference" json:"read_preference"`                   // 读取偏好：primary, primaryPreferred, secondary, secondaryPreferred, nearest
 	WriteConcern           string   `mapstructure:"write_concern" json:"write_concern"`                       // 写入关注：majority, 1, 0
+	IsLog                  bool     `mapstructure:"is_log" json:"is_log"`                                     // 是否记录日志
 	SlowThreshold          int      `mapstructure:"slow_threshold" json:"slow_threshold"`                     // 慢查询阈值，单位毫秒，默认500毫秒
 }
 
@@ -19,7 +20,7 @@ var Cfgs = make(map[string]*Config)
 
 func init() {
 	config.Register("mongodb", &Cfgs)
-	config.RegisterCallback("mongodb", Init)
+	config.RegisterCallback("mongodb", Init, "config", "log")
 }
 
 // HealthStatus MongoDB 健康状态
@@ -30,6 +31,6 @@ type HealthStatus struct {
 	Timestamp int64  `json:"timestamp"` // 检查时间戳
 	MaxPool   int    `json:"max_pool"`  // 最大连接池大小
 	InUse     int    `json:"in_use"`    // 正在使用连接数
-	Idle      int    `json:"idle"`      // 空闲连接数
+	Idle      int    `json:"idle"`      // 空闲连接数 (MongoDB驱动不直接提供)
 	Available int    `json:"available"` // 可用连接数
 }

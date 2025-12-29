@@ -3,6 +3,7 @@ package cron
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -16,8 +17,8 @@ import (
 
 // Task 定时任务接口
 type Task interface {
-	// Name 任务名称
-	Name() string
+	// Key 任务标识
+	Key() string
 	// Spec 任务调度表达式，支持 cron 格式
 	Spec() string
 	// BeforeRun 任务执行前
@@ -40,39 +41,16 @@ type Manager struct {
 	running bool
 }
 
-// 全局管理器实例，用于自动注册
-var globalManager *Manager
-
-// 延迟注册的任务队列
-var pendingTasks []Task
-
 // NewManager 创建定时任务管理器
 func NewManager() *Manager {
 	manager := &Manager{
-		cron:  cron.New(cron.WithSeconds()),
+		cron: cron.New(
+			cron.WithSeconds(),
+			cron.WithChain(cron.SkipIfStillRunning(cron.DefaultLogger)),
+		),
 		tasks: make(map[string]Task),
 	}
-	globalManager = manager
-
-	// 注册所有延迟注册的任务
-	for _, task := range pendingTasks {
-		manager.RegisterTask(task)
-	}
-	pendingTasks = nil
-
 	return manager
-}
-
-// AutoRegisterTask 自动注册任务到全局管理器
-func AutoRegisterTask(task Task) error {
-	if globalManager != nil {
-		// 管理器已创建，直接注册
-		return globalManager.RegisterTask(task)
-	} else {
-		// 管理器未创建，加入延迟注册队列
-		pendingTasks = append(pendingTasks, task)
-		return nil
-	}
 }
 
 // RegisterTask 注册定时任务
@@ -88,16 +66,16 @@ func (m *Manager) RegisterTask(task Task) error {
 		return fmt.Errorf("task cannot be nil")
 	}
 
-	name := task.Name()
-	if name == "" {
-		return fmt.Errorf("task name cannot be empty")
+	key := task.Key()
+	if key == "" {
+		return fmt.Errorf("task key cannot be empty")
 	}
 
-	if _, exists := m.tasks[name]; exists {
-		return fmt.Errorf("task %s already registered", name)
+	if _, exists := m.tasks[key]; exists {
+		return fmt.Errorf("task %s already registered", key)
 	}
 
-	m.tasks[name] = task
+	m.tasks[key] = task
 	return nil
 }
 
@@ -136,7 +114,7 @@ func (m *Manager) Start(ctx context.Context) error {
 }
 
 // Stop 停止定时任务管理器
-func (m *Manager) Stop() {
+func (m *Manager) Stop(ctx context.Context) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -144,21 +122,36 @@ func (m *Manager) Stop() {
 		return
 	}
 
-	ctx := m.cron.Stop()
-	<-ctx.Done()
+	c := m.cron.Stop()
+	<-c.Done()
 	m.running = false
 
-	logger.Info(context.Background(), "CRON", "Stopped cron manager")
+	logger.Info(ctx, "CRON", "Stopped cron manager")
 }
 
 // runTask 执行单个任务
 func (m *Manager) runTask(name string, task Task) error {
 	startTime := time.Now()
 
-	taskCtx := context.Background()
-	taskCtx = context.WithValue(taskCtx, constant.CtxTraceID, uuid.New().String())
+	// Create a base context with trace ID
+	baseCtx := context.Background()
+	baseCtx = context.WithValue(baseCtx, constant.CtxTraceID, uuid.New().String())
 
-	logger.Info(taskCtx, "CRON", "Task %s started", name)
+	logger.Info(baseCtx, "CRON", "Task %s started", name)
+
+	// Prepare the final context for the task
+	var (
+		taskCtx context.Context
+		cancel  context.CancelFunc
+	)
+
+	timeout := task.Timeout()
+	if timeout > 0 {
+		taskCtx, cancel = context.WithTimeout(baseCtx, timeout)
+	} else {
+		taskCtx, cancel = context.WithCancel(baseCtx)
+	}
+	defer cancel() // Ensure cancel is always called to free resources
 
 	type result struct {
 		err error
@@ -171,15 +164,21 @@ func (m *Manager) runTask(name string, task Task) error {
 			// 执行 BeforeRun 钩子
 			if beforeErr := task.BeforeRun(taskCtx); beforeErr != nil {
 				err = fmt.Errorf("before run failed: %w", beforeErr)
-				resultChan <- result{err: err}
+				return
+			}
+
+			// 检查上下文是否在任务开始前就已超时
+			if taskCtx.Err() != nil {
+				err = taskCtx.Err()
 				return
 			}
 
 			// 执行主任务逻辑
 			err = task.Run(taskCtx)
 
-			// 执行 AfterRun 钩子（无论主任务成功还是失败）
-			if afterErr := task.AfterRun(taskCtx); afterErr != nil {
+			// AfterRun 钩子应该总是被执行，即使任务超时。
+			// 我们使用 baseCtx 来运行它，以避免它因为 taskCtx 被取消而无法执行。
+			if afterErr := task.AfterRun(baseCtx); afterErr != nil {
 				if err != nil {
 					// 如果主任务也失败了，记录两个错误
 					err = fmt.Errorf("main task failed: %w, after run also failed: %w", err, afterErr)
@@ -192,27 +191,21 @@ func (m *Manager) runTask(name string, task Task) error {
 		resultChan <- result{err: err}
 	}()
 
-	var err error
-	timeout := task.Timeout()
+	// 等待任务执行结果
+	res := <-resultChan
+	err := res.err
 
-	if timeout > 0 {
-		select {
-		case res := <-resultChan:
-			err = res.err
-		case <-time.After(timeout):
-			err = fmt.Errorf("task %s timeout after %v", name, timeout)
-		}
-	} else {
-		res := <-resultChan
-		err = res.err
+	// 如果错误是由于上下文超时/取消引起的，包装成更明确的超时错误信息
+	if errors.Is(err, context.DeadlineExceeded) {
+		err = fmt.Errorf("task %s timeout after %v", name, timeout)
 	}
 
 	duration := time.Since(startTime)
 
 	if err != nil {
-		logger.ErrorWithMsg(taskCtx, "CRON", "Task %s failed after %v: %v", name, duration, err)
+		logger.ErrorWithMsg(baseCtx, "CRON", "Task %s failed after %v: %v", name, duration, err)
 	} else {
-		logger.Info(taskCtx, "CRON", "Task %s completed successfully in %v", name, duration)
+		logger.Info(baseCtx, "CRON", "Task %s completed successfully in %v", name, duration)
 	}
 	return err
 }
@@ -237,24 +230,17 @@ func (m *Manager) IsRunning() bool {
 }
 
 // RunTask 手动执行指定的任务
-// 参数：
-//   - ctx: 上下文，用于链路追踪和超时控制
-//   - taskName: 任务名称
-//
-// 返回：
-//   - error: 执行过程中的错误
 func (m *Manager) RunTask(ctx context.Context, taskName string) error {
 	m.mu.RLock()
 	task, exists := m.tasks[taskName]
 	m.mu.RUnlock()
 
 	if !exists {
-		return fmt.Errorf("task %s not found", taskName)
+		// 注意：这里的任务未找到，可能是因为配置中未启用或未定义
+		return fmt.Errorf("task %s not found (it may be disabled or not defined in config)", taskName)
 	}
 
-	if !task.Enabled() {
-		return fmt.Errorf("task %s is disabled", taskName)
-	}
-
+	// 直接执行，因为 m.tasks 中存储的已经是被 ConfigurableTask 包装过的任务
+	// 它自带了从配置中读取的超时等信息
 	return m.runTask(taskName, task)
 }

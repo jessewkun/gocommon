@@ -39,7 +39,8 @@ func ExampleMysqlUsage() {
 			Dsn:                       []string{"root:password@tcp(localhost:3306)/testdb?charset=utf8mb4&parseTime=True&loc=Local"},
 			MaxConn:                   100,
 			MaxIdleConn:               25,
-			ConnMaxLife:               3600,
+			ConnMaxLifeTime:           3600,
+			ConnMaxIdleTime:           600,
 			SlowThreshold:             500,
 			IgnoreRecordNotFoundError: true,
 			LogLevel:                  "info",
@@ -52,7 +53,8 @@ func ExampleMysqlUsage() {
 			},
 			MaxConn:                   50,
 			MaxIdleConn:               10,
-			ConnMaxLife:               3600,
+			ConnMaxLifeTime:           3600,
+			ConnMaxIdleTime:           600,
 			SlowThreshold:             1000,
 			IgnoreRecordNotFoundError: true,
 			LogLevel:                  "info",
@@ -163,51 +165,7 @@ func ExampleMysqlUsage() {
 		log.Printf("Failed to query user with orders: %v", err)
 	}
 
-	// 12. 事务处理
-	tx := NewTransaction(db)
-	if err := tx.tx.Begin().Error; err != nil {
-		log.Printf("Failed to begin transaction: %v", err)
-		return
-	}
-
-	// 在事务中执行操作
-	newUser := User{
-		Name:      "事务用户",
-		Email:     "transaction@example.com",
-		Age:       35,
-		Status:    1,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-
-	if err := tx.tx.Create(&newUser).Error; err != nil {
-		tx.Rollback()
-		log.Printf("Failed to create user in transaction: %v", err)
-		return
-	}
-
-	newOrder := Order{
-		UserID:    newUser.ID,
-		Amount:    199.99,
-		Status:    "pending",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-
-	if err := tx.tx.Create(&newOrder).Error; err != nil {
-		tx.Rollback()
-		log.Printf("Failed to create order in transaction: %v", err)
-		return
-	}
-
-	// 提交事务
-	if err := tx.Commit(); err != nil {
-		log.Printf("Failed to commit transaction: %v", err)
-	} else {
-		fmt.Println("Transaction completed successfully")
-	}
-
-	// 13. 原生 SQL 查询
+	// 12. 原生 SQL 查询
 	var count int64
 	if err := db.Raw("SELECT COUNT(*) FROM users WHERE age >= ?", 25).Scan(&count).Error; err != nil {
 		log.Printf("Failed to execute raw SQL: %v", err)
@@ -215,7 +173,7 @@ func ExampleMysqlUsage() {
 		fmt.Printf("Total users with age >= 25: %d\n", count)
 	}
 
-	// 14. 分页查询
+	// 13. 分页查询
 	var pageUsers []User
 	page := 1
 	pageSize := 10
@@ -227,7 +185,7 @@ func ExampleMysqlUsage() {
 		fmt.Printf("Page %d users: %d\n", page, len(pageUsers))
 	}
 
-	// 15. 聚合查询
+	// 14. 聚合查询
 	type UserStats struct {
 		AvgAge float64 `json:"avg_age"`
 		MaxAge int     `json:"max_age"`
@@ -242,13 +200,13 @@ func ExampleMysqlUsage() {
 		fmt.Printf("User stats: %+v\n", stats)
 	}
 
-	// 16. 健康检查
+	// 15. 健康检查
 	healthStatus := HealthCheck()
 	for dbName, status := range healthStatus {
 		fmt.Printf("MySQL %s health status: %+v\n", dbName, status)
 	}
 
-	// 17. 关闭连接
+	// 16. 关闭连接
 	if err := Close(); err != nil {
 		log.Printf("Failed to close MySQL connections: %v", err)
 	} else {

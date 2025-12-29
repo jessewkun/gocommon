@@ -12,17 +12,22 @@ type Client struct {
 // Config 用于初始化 ES 客户端
 // Example: Config{Addresses: []string{"http://localhost:9200"}}
 type Config struct {
-	Addresses []string `mapstructure:"addresses" json:"addresses"`
-	Username  string   `mapstructure:"username" json:"username"`
-	Password  string   `mapstructure:"password" json:"password"`
+	Addresses     []string `mapstructure:"addresses" json:"addresses"`
+	Username      string   `mapstructure:"username" json:"username"`
+	Password      string   `mapstructure:"password" json:"password"`
+	IsLog         bool     `mapstructure:"is_log" json:"is_log"`                 // 是否记录日志
+	SlowThreshold int      `mapstructure:"slow_threshold" json:"slow_threshold"` // 慢查询阈值，单位毫秒
 }
 
-// Cfgs is the configuration instance for the elasticsearch package.
-var Cfgs = make(map[string]*Config)
+var (
+	// Cfgs is the configuration instance for the elasticsearch package.
+	Cfgs           = make(map[string]*Config)
+	defaultManager *Manager
+)
 
 func init() {
 	config.Register("elasticsearch", &Cfgs)
-	config.RegisterCallback("elasticsearch", Init)
+	config.RegisterCallback("elasticsearch", Init, "config", "log")
 }
 
 // HealthStatus ES健康状态

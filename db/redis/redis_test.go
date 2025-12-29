@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/jessewkun/gocommon/logger"
 	"github.com/stretchr/testify/assert"
 )
@@ -23,70 +24,75 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestInit(t *testing.T) {
+// TestNewManager tests the NewManager constructor function.
+func TestNewManager(t *testing.T) {
 	redisTestMutex.Lock()
 	defer redisTestMutex.Unlock()
 
-	// Save and restore original global config for the entire test function.
-	originalCfgs := Cfgs
-	t.Cleanup(func() {
-		Cfgs = originalCfgs
-		Close()
-	})
-
 	testCases := []struct {
 		name       string
-		setupCfgs  func()
+		configs    map[string]*Config
 		checkError func(t *testing.T, err error)
-		checkConns func(t *testing.T)
+		checkMgr   func(t *testing.T, mgr *Manager)
 	}{
 		{
-			name: "successful initialization",
-			setupCfgs: func() {
-				Cfgs = map[string]*Config{
-					"test_db": {Addrs: []string{"localhost:6379"}},
-				}
+			name: "successful initialization single node",
+			configs: map[string]*Config{
+				"test_db": {Addrs: []string{"localhost:6379"}, IsCluster: false},
 			},
 			checkError: func(t *testing.T, err error) {
-				// We don't assert a specific error since it depends on a live redis.
-				// An error is acceptable if redis is not running.
+				if err != nil {
+					t.Logf("NewManager failed as DB might not be running, which is acceptable: %v", err)
+				}
 			},
-			checkConns: func(t *testing.T) {
-				connList.mu.RLock()
-				defer connList.mu.RUnlock()
-				_, ok := connList.conns["test_db"]
-				assert.True(t, ok, "connection for 'test_db' should have been created")
+			checkMgr: func(t *testing.T, mgr *Manager) {
+				assert.NotNil(t, mgr)
+				conn, err := mgr.GetConn("test_db")
+				// The connection should be in the map even if the ping failed
+				assert.NotNil(t, conn)
+				assert.NoError(t, err)
+				assert.IsType(t, &redis.Client{}, conn)
 			},
 		},
 		{
-			name: "initialization with no config",
-			setupCfgs: func() {
-				Cfgs = make(map[string]*Config)
+			name: "successful initialization cluster",
+			configs: map[string]*Config{
+				"test_cluster": {Addrs: []string{"localhost:6379"}, IsCluster: true},
 			},
 			checkError: func(t *testing.T, err error) {
-				assert.NoError(t, err, "Init should not error with empty config")
+				if err != nil {
+					t.Logf("NewManager failed as DB might not be running, which is acceptable: %v", err)
+				}
 			},
-			checkConns: func(t *testing.T) {
-				connList.mu.RLock()
-				defer connList.mu.RUnlock()
-				assert.Empty(t, connList.conns, "connection list should be empty with no config")
+			checkMgr: func(t *testing.T, mgr *Manager) {
+				assert.NotNil(t, mgr)
+				conn, err := mgr.GetConn("test_cluster")
+				assert.NotNil(t, conn)
+				assert.NoError(t, err)
+				assert.IsType(t, &redis.ClusterClient{}, conn)
 			},
 		},
 		{
-			name: "initialization with bad config",
-			setupCfgs: func() {
-				Cfgs = map[string]*Config{
-					"bad_db": {}, // Config with no address
-				}
-			},
+			name:    "initialization with no config",
+			configs: make(map[string]*Config),
 			checkError: func(t *testing.T, err error) {
-				assert.Error(t, err, "Init should error with bad config")
+				assert.NoError(t, err, "NewManager should not error with empty config")
+			},
+			checkMgr: func(t *testing.T, mgr *Manager) {
+				assert.NotNil(t, mgr)
+				assert.Empty(t, mgr.conns, "connection map should be empty with no config")
+			},
+		},
+		{
+			name:    "initialization with bad config (no address)",
+			configs: map[string]*Config{"bad_db": {}},
+			checkError: func(t *testing.T, err error) {
+				assert.Error(t, err, "NewManager should error with bad config")
 				assert.Contains(t, err.Error(), "redis addrs is empty")
 			},
-			checkConns: func(t *testing.T) {
-				connList.mu.RLock()
-				defer connList.mu.RUnlock()
-				assert.Empty(t, connList.conns, "connection list should be empty after a failed init")
+			checkMgr: func(t *testing.T, mgr *Manager) {
+				assert.NotNil(t, mgr)
+				assert.Empty(t, mgr.conns, "connection map should be empty after a failed init")
 			},
 		},
 	}
@@ -94,29 +100,38 @@ func TestInit(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Ensure a clean state for each test case.
-			Close()
-			tc.setupCfgs()
+			if defaultManager != nil {
+				_ = Close()
+			}
 
-			err := Init()
+			mgr, err := NewManager(tc.configs)
+			defer func() {
+				if mgr != nil {
+					_ = mgr.Close()
+				}
+			}()
 
 			if tc.checkError != nil {
 				tc.checkError(t, err)
 			}
-			if tc.checkConns != nil {
-				tc.checkConns(t)
+			if tc.checkMgr != nil {
+				tc.checkMgr(t, mgr)
 			}
 		})
 	}
 }
 
-func TestGetConn_And_Close(t *testing.T) {
+// TestGlobalFunctions tests Init, GetConn, and Close global functions.
+func TestGlobalFunctions(t *testing.T) {
 	redisTestMutex.Lock()
 	defer redisTestMutex.Unlock()
 
 	originalCfgs := Cfgs
 	t.Cleanup(func() {
 		Cfgs = originalCfgs
-		Close()
+		if defaultManager != nil {
+			_ = Close()
+		}
 	})
 
 	Cfgs = map[string]*Config{
@@ -124,8 +139,6 @@ func TestGetConn_And_Close(t *testing.T) {
 			Addrs: []string{"localhost:6379"},
 		},
 	}
-	// This part of the test requires a running Redis server.
-	// We call Init and check for an error to see if we can proceed.
 	if Init() != nil {
 		t.Skip("skipping test; could not connect to redis. please ensure redis is running on localhost:6379")
 	}
@@ -148,9 +161,10 @@ func TestGetConn_And_Close(t *testing.T) {
 	t.Run("close connections", func(t *testing.T) {
 		errClose := Close()
 		assert.NoError(t, errClose)
-		connList.mu.RLock()
-		assert.Empty(t, connList.conns)
-		connList.mu.RUnlock()
+		assert.NotNil(t, defaultManager)
+		defaultManager.mu.RLock()
+		assert.Empty(t, defaultManager.conns)
+		defaultManager.mu.RUnlock()
 	})
 }
 

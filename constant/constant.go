@@ -15,6 +15,12 @@ const CtxTraceID ContextKey = "trace_id"
 // CtxUserID 用于设置gin.Context中的key来存储user_id
 const CtxUserID ContextKey = "user_id"
 
+// CtxStudentID 用于设置gin.Context中的key来存储student_id
+const CtxStudentID ContextKey = "student_id"
+
+// CtxTeacherID 用于设置gin.Context中的key来存储teacher_id
+const CtxTeacherID ContextKey = "teacher_id"
+
 // CtxCurrentRequestPath 用于设置gin.Context中的key来存储当前请求路径
 const CtxCurrentRequestPath ContextKey = "current_request_path"
 

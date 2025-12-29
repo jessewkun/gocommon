@@ -5,8 +5,8 @@
 ## 功能特性
 
 -   ✅ 支持多实例连接管理
+-   ✅ 支持单点模式和集群模式
 -   ✅ 支持连接池配置
--   ✅ 支持集群模式
 -   ✅ 支持健康检查
 -   ✅ 支持日志记录
 -   ✅ 支持慢查询监控
@@ -21,10 +21,11 @@
 type Config struct {
     Addrs              []string // Redis 地址列表 ip:port
     Password           string   // Redis 密码
-    Db                 int      // Redis 数据库编号
+    Db                 int      // Redis 数据库编号（仅单点模式有效）
+    IsCluster          bool     // 是否为集群模式
     IsLog              bool     // 是否记录日志
-    PoolSize           int      // 连接池大小，默认500
-    IdleTimeout        int      // 空闲连接超时时间，单位秒，默认1秒
+    PoolSize           int      // 连接池大小，默认100
+    IdleTimeout        int      // 空闲连接超时时间，单位秒，默认300秒
     IdleCheckFrequency int      // 空闲连接检查频率，单位秒，默认10秒
     MinIdleConns       int      // 最小空闲连接数，默认3
     MaxRetries         int      // 最大重试次数，默认3
@@ -41,6 +42,7 @@ redis.Cfgs = map[string]*redis.Config{
         Addrs:              []string{"localhost:6379"},
         Password:           "",
         Db:                 0,
+        IsCluster:          false, // 明确指定为非集群模式
         IsLog:              true,
         PoolSize:           100,
         IdleTimeout:        300,
@@ -53,7 +55,7 @@ redis.Cfgs = map[string]*redis.Config{
     "cluster": {
         Addrs:              []string{"localhost:7000", "localhost:7001", "localhost:7002"},
         Password:           "",
-        Db:                 0,
+        IsCluster:          true, // 明确指定为集群模式
         IsLog:              true,
         PoolSize:           50,
         IdleTimeout:        300,
@@ -76,7 +78,7 @@ import "github.com/jessewkun/gocommon/db/redis"
 // 先设置全局配置
 redis.Cfgs = ... // 见上方示例
 // 初始化 Redis 连接
-if err := redis.InitRedis(); err != nil {
+if err := redis.Init(); err != nil {
     log.Fatalf("Failed to initialize Redis: %v", err)
 }
 ```
@@ -84,7 +86,7 @@ if err := redis.InitRedis(); err != nil {
 ### 2. 获取 Redis 连接
 
 ```go
-// 获取 Redis 连接
+// 获取 Redis 连接, 返回的是一个 redis.UniversalClient 接口
 client, err := redis.GetConn("default")
 if err != nil {
     log.Fatalf("Failed to get Redis connection: %v", err)
@@ -287,22 +289,25 @@ for dbName, status := range healthStatus {
 
 ### 集群模式
 
-支持 Redis 集群模式，可以配置多个节点：
+通过在配置中设置 `IsCluster: true` 来启用 Redis 集群模式。
 
 ```go
-// 注意：集群模式下需配置所有节点地址，且部分命令不支持跨 slot 操作。
+// 在配置中启用集群模式
 redisConfig := map[string]*Config{
     "cluster": {
-        Addrs: []string{
+        Addrs: []string{ // 提供所有集群节点的地址
             "localhost:7000",
             "localhost:7001",
             "localhost:7002",
         },
+        IsCluster: true, // 必须设置为 true
         PoolSize: 50,
         // ... 其他配置
     },
 }
 ```
+本模块会使用 `go-redis` 的 `ClusterClient` 来创建连接，它能自动处理请求到正确节点的路由。
+**注意**：在集群模式下，`Db` 配置项是无效的。部分命令（如涉及多 key 的非哈希槽内操作）可能会受限。
 
 ### 慢查询监控
 
@@ -322,33 +327,33 @@ redisConfig := map[string]*Config{
 
 模块提供了完善的错误处理机制：
 
-1. **连接错误**: 自动重试和日志记录
-2. **超时错误**: 可配置的超时时间
-3. **健康检查**: 定期检查连接状态
-4. **慢查询监控**: 记录慢查询日志
+1. **连接错误**: 初始化时会尝试连接所有配置的实例并聚合所有错误。
+2. **超时错误**: 可配置的连接和读写超时时间。
+3. **健康检查**: 定期检查连接状态。
+4. **慢查询监控**: 记录慢查询日志。
 
 ## 性能优化
 
-1. **连接池复用**: 自动管理连接池，避免频繁创建和销毁连接
-2. **管道操作**: 支持批量执行命令，减少网络往返
-3. **事务支持**: 支持 Redis 事务，确保数据一致性
-4. **集群模式**: 支持 Redis 集群，提高可用性和性能
+1. **连接池复用**: 自动管理连接池，避免频繁创建和销毁连接。
+2. **管道操作**: 支持批量执行命令，减少网络往返。
+3. **事务支持**: 支持 Redis 事务，确保操作原子性。
+4. **正确使用集群**: 通过 `IsCluster` 标志，模块能正确利用 `go-redis` 的集群客户端，高效地将请求路由到正确的节点。
 
 ## 注意事项
 
-1. **连接字符串**: 确保连接地址格式正确
-2. **超时配置**: 根据网络环境调整超时时间
-3. **连接池大小**: 根据并发量和服务器资源调整连接池大小
-4. **密码安全**: 使用安全的密码，避免明文存储
-5. **集群配置**: 集群模式下需要配置所有节点地址
+1. **连接字符串**: 确保连接地址格式正确。
+2. **超时配置**: 根据网络环境合理调整 `DialTimeout`。
+3. **连接池大小**: 根据并发量和服务器资源调整 `PoolSize`。
+4. **密码安全**: 建议使用安全的密码，并通过配置中心等方式管理，避免明文存储。
+5. **集群配置**: 集群模式下需要设置 `IsCluster: true` 并提供所有节点的地址。
 
 ## 示例代码
 
-完整的使用示例请参考 example.go 文件。
+完整的使用示例请参考 `example.go` 文件。
 
 ## 测试用例
 
-完整的测试用例请参考 redis_test.go 文件。
+完整的测试用例请参考 `redis_test.go` 文件。
 
 ## 依赖
 

@@ -87,6 +87,10 @@ func initCore() zapcore.Core {
 	}
 
 	syncWriter := zapcore.NewMultiWriteSyncer(opts...)
+	logLevel, err := zapcore.ParseLevel(Cfg.LogLevel)
+	if err != nil {
+		logLevel = zapcore.DebugLevel
+	}
 
 	encoderConf := zapcore.EncoderConfig{
 		CallerKey:     "caller_line",
@@ -105,7 +109,7 @@ func initCore() zapcore.Core {
 	}
 
 	return zapcore.NewCore(zapcore.NewJSONEncoder(encoderConf),
-		syncWriter, zap.NewAtomicLevelAt(zapcore.DebugLevel))
+		syncWriter, zap.NewAtomicLevelAt(logLevel))
 }
 
 // formatField 格式化字段
@@ -232,6 +236,16 @@ func Debug(c context.Context, tag string, msg string, args ...interface{}) {
 		Level:   DebugLevel,
 		Tag:     tag,
 		Message: fmt.Sprintf(msg, args...),
+	})
+}
+
+// DebugWithField 记录带字段的调试日志
+func DebugWithField(c context.Context, tag string, msg string, fields map[string]interface{}) {
+	log(c, LogEntry{
+		Level:   DebugLevel,
+		Tag:     tag,
+		Message: msg,
+		Fields:  fields,
 	})
 }
 

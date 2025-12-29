@@ -2,70 +2,53 @@
 package nacos
 
 import (
-	"context"
+	"errors"
 	"fmt"
 
-	"github.com/jessewkun/gocommon/logger"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients"
 	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 )
 
-// Init 初始化nacos客户端
+// Init 初始化 defaultManager
 func Init() error {
-	var initErr error
-	for clientName, conf := range Cfgs {
-		err := setDefaultConfig(conf)
-		if err != nil {
-			initErr = fmt.Errorf("nacos %s setDefaultConfig error: %w", clientName, err)
-			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
-			break
-		}
-		if err := newClient(clientName, conf); err != nil {
-			initErr = fmt.Errorf("connect to nacos %s failed, error: %w", clientName, err)
-			logger.ErrorWithMsg(context.Background(), TAG, initErr.Error())
-			break
-		}
-	}
-	return initErr
+	var err error
+	defaultManager, err = NewManager(Cfgs)
+	return err
 }
 
 // setDefaultConfig 设置默认配置
 func setDefaultConfig(conf *Config) error {
+	defaultConf := DefaultConfig()
 	if conf.Host == "" {
-		conf.Host = "localhost"
+		conf.Host = defaultConf.Host
 	}
-
 	if conf.Port == 0 {
-		conf.Port = 8848
+		conf.Port = defaultConf.Port
 	}
-
 	if conf.Namespace == "" {
-		conf.Namespace = "public"
+		conf.Namespace = defaultConf.Namespace
 	}
-
 	if conf.Group == "" {
-		conf.Group = "DEFAULT_GROUP"
+		conf.Group = defaultConf.Group
 	}
-
 	if conf.Timeout == 0 {
-		conf.Timeout = 5000
+		conf.Timeout = defaultConf.Timeout
 	}
-
+	if conf.LogDir == "" {
+		conf.LogDir = defaultConf.LogDir
+	}
+	if conf.CacheDir == "" {
+		conf.CacheDir = defaultConf.CacheDir
+	}
+	if conf.LogLevel == "" {
+		conf.LogLevel = defaultConf.LogLevel
+	}
 	return nil
 }
 
-// newClient 创建nacos客户端
-func newClient(clientName string, conf *Config) error {
-	connList.mu.Lock()
-	defer connList.mu.Unlock()
-
-	if _, ok := connList.clients[clientName]; ok {
-		if connList.clients[clientName] != nil {
-			return nil
-		}
-	}
-
+// newClient 根据配置创建 nacos 客户端
+func newClient(conf *Config) (*Client, error) {
 	// 创建服务器配置
 	serverConfigs := []constant.ServerConfig{
 		{
@@ -78,10 +61,10 @@ func newClient(clientName string, conf *Config) error {
 	clientConfig := constant.ClientConfig{
 		NamespaceId:         conf.Namespace,
 		TimeoutMs:           uint64(conf.Timeout),
-		NotLoadCacheAtStart: true,
-		LogDir:              "/tmp/nacos/log",
-		CacheDir:            "/tmp/nacos/cache",
-		LogLevel:            "debug",
+		NotLoadCacheAtStart: conf.NotLoadCacheAtStart,
+		LogDir:              conf.LogDir,
+		CacheDir:            conf.CacheDir,
+		LogLevel:            conf.LogLevel,
 	}
 
 	// 如果有用户名密码，设置认证信息
@@ -98,7 +81,7 @@ func newClient(clientName string, conf *Config) error {
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create config client: %w", err)
+		return nil, fmt.Errorf("failed to create config client: %w", err)
 	}
 
 	// 创建命名客户端
@@ -109,7 +92,8 @@ func newClient(clientName string, conf *Config) error {
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create naming client: %w", err)
+		configClient.CloseClient() // 如果命名客户端创建失败，关闭已创建的配置客户端
+		return nil, fmt.Errorf("failed to create naming client: %w", err)
 	}
 
 	client := &Client{
@@ -118,43 +102,21 @@ func newClient(clientName string, conf *Config) error {
 		config:       conf,
 	}
 
-	connList.clients[clientName] = client
-	logger.Info(context.Background(), TAG, "connect to nacos %s succ", clientName)
-
-	return nil
+	return client, nil
 }
 
-// GetConn 获取nacos客户端连接
-func GetConn(clientName string) (*Client, error) {
-	connList.mu.RLock()
-	defer connList.mu.RUnlock()
-
-	if _, ok := connList.clients[clientName]; !ok {
-		return nil, fmt.Errorf("nacos client '%s' is not found", clientName)
+// GetClient 获取nacos客户端连接
+func GetClient(clientName string) (*Client, error) {
+	if defaultManager == nil {
+		return nil, errors.New("nacos manager is not initialized")
 	}
-
-	return connList.clients[clientName], nil
+	return defaultManager.GetClient(clientName)
 }
 
 // Close 关闭所有nacos客户端连接
 func Close() error {
-	connList.mu.Lock()
-	defer connList.mu.Unlock()
-
-	var lastErr error
-	for clientName, client := range connList.clients {
-		if client != nil {
-			if err := client.Close(); err != nil {
-				lastErr = fmt.Errorf("close nacos %s failed: %w", clientName, err)
-				logger.ErrorWithMsg(context.Background(), TAG, lastErr.Error())
-			} else {
-				logger.Info(context.Background(), TAG, "close nacos %s succ", clientName)
-			}
-		}
+	if defaultManager == nil {
+		return errors.New("nacos manager is not initialized")
 	}
-
-	// 清空连接列表
-	connList.clients = make(map[string]*Client)
-
-	return lastErr
+	return defaultManager.Close()
 }

@@ -121,19 +121,9 @@ func (c *Client) UnsubscribeService(serviceName string) error {
 }
 
 // GetServices 获取所有服务
-func (c *Client) GetServices(pageNo, pageSize int) error {
-	_, err := c.namingClient.GetAllServicesInfo(vo.GetAllServiceInfoParam{
+func (c *Client) GetServices(pageNo, pageSize int) (model.ServiceList, error) {
+	return c.namingClient.GetAllServicesInfo(vo.GetAllServiceInfoParam{
 		PageNo:   uint32(pageNo),
 		PageSize: uint32(pageSize),
 	})
-	if err != nil {
-		return fmt.Errorf("failed to get services: %w", err)
-	}
-	return nil
-}
-
-// Close 关闭客户端
-func (c *Client) Close() error {
-	// nacos客户端没有显式的关闭方法，这里可以做一些清理工作
-	return nil
 }

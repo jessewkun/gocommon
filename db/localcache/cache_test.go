@@ -100,7 +100,8 @@ func TestBigCache_ComplexData(t *testing.T) {
 		if retrieved["string"] != "hello" {
 			t.Fatalf("Expected 'hello', got %v", retrieved["string"])
 		}
-		if retrieved["int"] != float64(123) { // JSON unmarshals numbers as float64
+		// JSON unmarshals numbers into float64 by default
+		if int(retrieved["int"].(float64)) != 123 {
 			t.Fatalf("Expected 123, got %v", retrieved["int"])
 		}
 	} else {
@@ -123,21 +124,24 @@ func TestBigCache_Delete(t *testing.T) {
 		t.Fatal("Delete should return true for existing key")
 	}
 
-	// 验证已删除（BigCache不支持真正的删除，我们通过检查值是否为空来判断）
-	value, exists := cache.Get("key1")
-	if exists && value != nil {
-		t.Fatal("key1 should be deleted or have nil value")
+	// 验证已删除. Get 应该返回 false.
+	_, exists := cache.Get("key1")
+	if exists {
+		t.Fatal("key1 should be deleted, Get should return false")
 	}
 
-	// 删除不存在的key
+	// 删除不存在的key (实际上是设置一个删除标记)
 	deleted = cache.Delete("nonexistent")
-	// BigCache不支持真正的删除，始终返回true
 	if !deleted {
-		t.Fatal("Delete should always return true for BigCache")
+		t.Fatal("Delete should always return true")
+	}
+	_, exists = cache.Get("nonexistent")
+	if exists {
+		t.Fatal("nonexistent key should return false after delete")
 	}
 }
 
-func TestBigCache_Clear(t *testing.T) {
+func TestBigCache_ResetStats(t *testing.T) {
 	cache, err := NewDefaultBigCache()
 	if err != nil {
 		t.Fatalf("Failed to create cache: %v", err)
@@ -146,18 +150,32 @@ func TestBigCache_Clear(t *testing.T) {
 
 	cache.Set("key1", "value1")
 	cache.Set("key2", "value2")
+	cache.Get("key1")
 
+	// 重置前检查
+	statsBefore := cache.Stats()
+	if statsBefore.Hits == 0 {
+		t.Fatalf("Expected hits > 0 before reset, got %d", statsBefore.Hits)
+	}
 	if cache.Size() != 2 {
 		t.Fatalf("Expected size 2, got %d", cache.Size())
 	}
 
-	cache.Clear()
+	cache.ResetStats()
 
-	// bigcache的Clear只是重置统计信息，不会真正清空数据
-	// 所以我们检查统计信息是否被重置
-	stats := cache.Stats()
-	if stats.Hits != 0 || stats.Misses != 0 {
-		t.Fatalf("Stats should be reset after clear")
+	// 检查统计信息是否被重置
+	statsAfter := cache.Stats()
+	if statsAfter.Hits != 0 || statsAfter.Misses != 0 {
+		t.Fatalf("Stats should be reset after clear, got Hits=%d, Misses=%d", statsAfter.Hits, statsAfter.Misses)
+	}
+
+	// 验证数据仍然存在
+	if cache.Size() != 2 {
+		t.Fatalf("Size should not be affected by ResetStats, got %d", cache.Size())
+	}
+	val, exists := cache.Get("key1")
+	if !exists || val != "value1" {
+		t.Fatal("Data should still exist after ResetStats")
 	}
 }
 
@@ -180,6 +198,7 @@ func TestBigCache_Stats(t *testing.T) {
 	cache.Get("nonexistent")
 
 	stats := cache.Stats()
+	// stats can be racy without a lock, so we check for minimums
 	if stats.Hits < 2 {
 		t.Fatalf("Expected at least 2 hits, got %d", stats.Hits)
 	}
@@ -188,7 +207,7 @@ func TestBigCache_Stats(t *testing.T) {
 	}
 
 	hitRate := stats.HitRate()
-	if hitRate <= 0 {
+	if hitRate <= 0.5 {
 		t.Fatalf("Expected positive hit rate, got %f", hitRate)
 	}
 }
@@ -226,6 +245,7 @@ func TestTypedBigCache(t *testing.T) {
 
 func TestManager(t *testing.T) {
 	manager := NewManager()
+	defer manager.ClearAll()
 
 	// 创建缓存
 	cache1, err := manager.GetCache("cache1", 1000)
@@ -263,9 +283,50 @@ func TestManager(t *testing.T) {
 	if len(caches) != 2 {
 		t.Fatalf("Expected 2 cache names, got %d", len(caches))
 	}
+}
 
-	// 清理
-	manager.ClearAll()
+func TestManager_GetTypedCache(t *testing.T) {
+	type User struct {
+		ID   int
+		Name string
+	}
+
+	manager := NewManager()
+	defer manager.ClearAll()
+
+	// 获取类型安全的缓存
+	userCache, err := GetTypedCache[User](manager, "users", 1000)
+	if err != nil {
+		t.Fatalf("Failed to get typed cache: %v", err)
+	}
+
+	// 设置和获取
+	user := User{ID: 1, Name: "Alice"}
+	err = userCache.Set("user:1", user)
+	if err != nil {
+		t.Fatalf("Set failed on typed cache: %v", err)
+	}
+
+	retrievedUser, exists := userCache.Get("user:1")
+	if !exists {
+		t.Fatal("Get failed on typed cache: user:1 should exist")
+	}
+	if retrievedUser.ID != user.ID || retrievedUser.Name != user.Name {
+		t.Fatalf("Expected user %v, got %v", user, retrievedUser)
+	}
+
+	// 确保获取的是同一个实例
+	userCache2, err := GetTypedCache[User](manager, "users", 1000)
+	if err != nil {
+		t.Fatalf("Failed to get same typed cache again: %v", err)
+	}
+	retrievedUser2, exists2 := userCache2.Get("user:1")
+	if !exists2 {
+		t.Fatal("Get from second accessor failed")
+	}
+	if retrievedUser2.ID != user.ID {
+		t.Fatal("Second accessor got wrong data")
+	}
 }
 
 func BenchmarkBigCache_Set(b *testing.B) {
@@ -275,6 +336,7 @@ func BenchmarkBigCache_Set(b *testing.B) {
 	}
 	defer cache.Close()
 
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cache.Set("key"+string(rune(i)), "value"+string(rune(i)))
@@ -293,6 +355,7 @@ func BenchmarkBigCache_Get(b *testing.B) {
 		cache.Set("key"+string(rune(i)), "value"+string(rune(i)))
 	}
 
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cache.Get("key" + string(rune(i%1000)))
@@ -318,6 +381,7 @@ func BenchmarkBigCache_ComplexData(b *testing.B) {
 		},
 	}
 
+	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cache.Set("complex"+string(rune(i)), complexData)
