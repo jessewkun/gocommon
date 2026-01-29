@@ -1,40 +1,21 @@
 {
-    "editor.tabSize": 4,
+  "editor.detectIndentation": false,
+  "editor.formatOnSave": true,
+  "[go]": {
+    "editor.insertSpaces": false,
+    "editor.tabSize": 4
+  },
+  "go.formatTool": "gofmt",
+  "[json]": {
     "editor.insertSpaces": true,
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-        "source.fixAll.eslint": "explicit"
-    },
-    "[toml]": {
-        "editor.tabSize": 2,
-        "editor.insertSpaces": true,
-        "editor.detectIndentation": false,
-        "editor.defaultFormatter": null // 禁用插件影响
-    },
-    "[yaml]": {
-        "editor.tabSize": 2,
-        "editor.insertSpaces": true
-    },
-    "files.eol": "\n",
-    "files.trimTrailingWhitespace": true,
-    "files.trimFinalNewlines": true,
-    "files.insertFinalNewline": true,
-
-    "go.lintTool": "staticcheck",
-    "go.lintOnSave": "package",
-    "go.lintFlags": ["--fast"],
-    "go.toolsManagement.autoUpdate": true,
-    "go.useLanguageServer": true,
-    "go.testFlags": ["-timeout=2m", "-v"],
-    "go.testOnSave": false,
-    "go.toolsEnvVars": {
-        "GO111MODULE": "on"
-    },
-    "gopls": {
-        "usePlaceholders": true,
-        "staticcheck": true,
-        "ui.diagnostic.analyses": {
-            "unusedparams": true
-        }
-    }
+    "editor.tabSize": 2
+  },
+  "[yaml]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  },
+  "[toml]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  }
 }

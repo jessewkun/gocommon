@@ -14,6 +14,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	// SkipBodyLogKey 用于在 context 中标记是否跳过请求体或响应体日志的键
+	SkipBodyLogKey = "skip_body_log"
+)
+
+type SkipBodyType int
+
+const (
+	SkipAllBody      SkipBodyType = 0
+	SkipRequestBody  SkipBodyType = 1
+	SkipResponseBody SkipBodyType = 2
+)
+
 // IOLogConfig 配置选项
 type IOLogConfig struct {
 	// 是否记录请求体
@@ -41,8 +54,8 @@ func DefaultIOLogConfig() *IOLogConfig {
 	return &IOLogConfig{
 		LogRequestBody:      true,
 		LogResponseBody:     true,
-		MaxRequestBodySize:  1024 * 1024, // 1MB
-		MaxResponseBodySize: 1024 * 1024, // 1MB
+		MaxRequestBodySize:  100 * 1024, // 100KB
+		MaxResponseBodySize: 100 * 1024, // 100KB
 		SensitiveFields: []string{
 			`(?i)password`,
 			`(?i)token`,
@@ -70,25 +83,49 @@ func IOLog(config *IOLogConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 
-		// 读取请求体
+		// 读取请求体（需要在 c.Next() 之前读取，因为请求体只能读取一次）
+		// 如果后续设置了 skipRequestBody，则不记录到日志中
 		var requestBody []byte
 		if config.LogRequestBody && c.Request.Method == http.MethodPost {
 			if c.Request.ContentLength > config.MaxRequestBodySize {
 				requestBody = []byte("[请求体超过大小限制]")
 			} else {
 				requestBody, _ = io.ReadAll(c.Request.Body)
-				// 恢复请求体
 				c.Request.Body = io.NopCloser(strings.NewReader(string(requestBody)))
 			}
 		}
 
-		// 处理请求
+		// 处理请求（此时 SkipBodyLog 等中间件会执行并设置标记）
 		c.Next()
+
+		// 检查是否跳过请求体或响应体日志（在 c.Next() 之后检查，此时标记已经设置）
+		skipRequestBody := false
+		skipResponseBody := false
+		if skipType, exists := c.Get(SkipBodyLogKey); exists {
+			if bodyType, ok := skipType.(SkipBodyType); ok {
+				switch bodyType {
+				case SkipAllBody:
+					skipRequestBody = true
+					skipResponseBody = true
+				case SkipRequestBody:
+					skipRequestBody = true
+				case SkipResponseBody:
+					skipResponseBody = true
+				}
+			}
+		}
+
+		// 获取响应大小
+		responseSize := c.Writer.Size()
 
 		// 获取响应体
 		var responseBody interface{}
-		if config.LogResponseBody {
-			responseBody, _ = c.Get(string(constant.CtxAPIOutput))
+		if config.LogResponseBody && !skipResponseBody {
+			if config.MaxResponseBodySize > 0 && int64(responseSize) > config.MaxResponseBodySize {
+				responseBody = "[响应体超过大小限制]"
+			} else {
+				responseBody, _ = c.Get(string(constant.CtxAPIOutput))
+			}
 		}
 
 		// 构建日志字段
@@ -115,7 +152,7 @@ func IOLog(config *IOLogConfig) gin.HandlerFunc {
 		}
 
 		// 添加请求体
-		if config.LogRequestBody && len(requestBody) > 0 {
+		if config.LogRequestBody && len(requestBody) > 0 && !skipRequestBody {
 			fields["request_body"] = maskSensitiveData(string(requestBody), sensitiveRegexps)
 		}
 
@@ -125,7 +162,7 @@ func IOLog(config *IOLogConfig) gin.HandlerFunc {
 		}
 
 		// 添加响应大小
-		fields["response_length"] = c.Writer.Size()
+		fields["response_length"] = responseSize
 
 		// 根据状态码选择日志级别
 		var logFunc func(c context.Context, tag string, msg string, field map[string]interface{})
@@ -144,8 +181,26 @@ func IOLog(config *IOLogConfig) gin.HandlerFunc {
 	}
 }
 
+// SkipBodyLog 返回一个中间件函数，用于标记跳过请求体或响应体日志记录，
+// 一般要求都记录，但是部分接口响应体比较大，可以跳过记录，例如文件下载、文件上传等接口。
+// 可以在单个路由或路由组中使用，例如：
+//
+//	router.GET("/api/export", SkipBodyLog(SkipResponseBody), exportHandler)
+//	或
+//	exportGroup := router.Group("/api/export", SkipBodyLog(SkipResponseBody))
+func SkipBodyLog(skipBodyType SkipBodyType) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Set(SkipBodyLogKey, skipBodyType)
+		c.Next()
+	}
+}
+
 // maskSensitiveData 对敏感数据进行脱敏处理
 func maskSensitiveData(data string, patterns []*regexp.Regexp) string {
+	if len(patterns) == 0 {
+		return data
+	}
+
 	for _, pattern := range patterns {
 		data = pattern.ReplaceAllStringFunc(data, func(s string) string {
 			return strings.Repeat("*", len(s))

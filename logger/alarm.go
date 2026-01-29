@@ -56,7 +56,7 @@ func SendAlarm(c context.Context, level string, tag string, msg string, err erro
 func ForceSendAlarm(c context.Context, level string, tag string, msg string, err error) {
 	if alerter == nil {
 		// 如果没有注册报警器，只打印一条日志提示
-		log(c, LogEntry{
+		_log(c, LogEntry{
 			Level:   WarnLevel,
 			Tag:     "ALERTER_NOT_REGISTERED",
 			Message: "Alerter is not registered, unable to send alarm.",
@@ -75,7 +75,7 @@ func ForceSendAlarm(c context.Context, level string, tag string, msg string, err
 
 	if sendErr := alerter.Send(c, title, content); sendErr != nil {
 		// 报警发送失败，记录错误日志，但不再触发新的报警，避免循环
-		log(c, LogEntry{
+		_log(c, LogEntry{
 			Level:   ErrorLevel,
 			Tag:     "ALERTER_ERROR",
 			Message: fmt.Sprintf("Failed to send alarm via alerter: %v", sendErr),

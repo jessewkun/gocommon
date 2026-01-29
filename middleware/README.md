@@ -172,44 +172,113 @@ r.Use(middleware.IPRateLimiter(10, 20))
 
 ### IO 日志中间件
 
-`IOLog()` 记录请求和响应的详细信息，支持敏感数据脱敏。
+`IOLog()` 记录请求和响应的详细信息，支持敏感数据脱敏、大小限制和跳过响应体日志。
 
 **函数签名：**
 
 ```go
-func IOLog(options ...IOLogOption) gin.HandlerFunc
+func IOLog(config *IOLogConfig) gin.HandlerFunc
 ```
 
 **功能特性：**
 
 - 记录请求体、响应体、请求头、查询参数
 - 敏感数据脱敏（支持正则表达式配置）
-- 可配置请求体和响应体大小限制
+- 可配置请求体和响应体大小限制（默认 100KB）
+- 请求体和响应体超过大小限制时记录提示信息
+- 支持跳过特定路由的请求体或响应体日志记录（使用 `SkipBodyLog`）
 - 记录客户端 IP、User-Agent 等信息
+- 根据 HTTP 状态码智能选择日志级别
+
+**IOLogConfig 配置结构：**
+
+```go
+type IOLogConfig struct {
+    LogRequestBody      bool     // 是否记录请求体，默认 true
+    LogResponseBody     bool     // 是否记录响应体，默认 true
+    MaxRequestBodySize  int64    // 请求体大小限制（字节），默认 100KB
+    MaxResponseBodySize int64    // 响应体大小限制（字节），默认 100KB
+    SensitiveFields     []string // 需要脱敏的字段（正则表达式）
+    LogHeaders          bool     // 是否记录请求头，默认 false
+    LogQuery            bool     // 是否记录查询参数，默认 true
+    LogPath             bool     // 是否记录路径，默认 true
+    LogClientInfo       bool     // 是否记录客户端信息，默认 true
+}
+```
 
 **使用示例：**
 
 ```go
 import "github.com/jessewkun/gocommon/middleware"
 
-// 使用默认配置
-r.Use(middleware.IOLog())
+// 使用默认配置（请求体和响应体大小限制为 100KB）
+r.Use(middleware.IOLog(nil))
 
 // 自定义配置
-r.Use(middleware.IOLog(
-    middleware.WithSensitiveFields([]string{"password", "token", "secret"}),
-    middleware.WithMaxBodySize(1024 * 1024), // 1MB
-    middleware.WithRequestLogging(true),
-    middleware.WithResponseLogging(true),
-))
+config := &middleware.IOLogConfig{
+    LogRequestBody:      true,
+    LogResponseBody:      true,
+    MaxRequestBodySize:  200 * 1024,  // 200KB
+    MaxResponseBodySize: 200 * 1024,  // 200KB
+    SensitiveFields: []string{
+        `(?i)password`,
+        `(?i)token`,
+        `(?i)secret`,
+    },
+    LogHeaders:    false,
+    LogQuery:      true,
+    LogPath:       true,
+    LogClientInfo: true,
+}
+r.Use(middleware.IOLog(config))
 ```
 
-**配置选项：**
+**跳过请求体或响应体日志：**
 
-- `WithSensitiveFields(fields []string)`：设置敏感字段列表
-- `WithMaxBodySize(size int64)`：设置请求体和响应体最大记录大小
-- `WithRequestLogging(enabled bool)`：是否记录请求日志
-- `WithResponseLogging(enabled bool)`：是否记录响应日志
+对于请求体或响应体较大的接口（如文件下载、文件上传等），可以使用 `SkipBodyLog()` 跳过日志记录：
+
+**SkipBodyType 类型说明：**
+
+- `SkipAllBody`：跳过请求体和响应体日志
+- `SkipRequestBody`：只跳过请求体日志
+- `SkipResponseBody`：只跳过响应体日志
+
+**使用示例：**
+
+```go
+// 跳过响应体日志（文件下载接口）
+router.GET("/api/export", middleware.SkipBodyLog(middleware.SkipResponseBody), exportHandler)
+router.GET("/api/download/:file", middleware.SkipBodyLog(middleware.SkipResponseBody), downloadHandler)
+
+// 跳过请求体日志（文件上传接口）
+router.POST("/api/upload", middleware.SkipBodyLog(middleware.SkipRequestBody), uploadHandler)
+router.PUT("/api/batch", middleware.SkipBodyLog(middleware.SkipRequestBody), batchHandler)
+
+// 同时跳过请求体和响应体日志（大文件上传接口）
+router.POST("/api/upload-large", middleware.SkipBodyLog(middleware.SkipAllBody), uploadLargeHandler)
+
+// 路由组跳过响应体日志
+exportGroup := router.Group("/api/export", middleware.SkipBodyLog(middleware.SkipResponseBody))
+exportGroup.GET("/data", exportHandler)
+exportGroup.GET("/report", reportHandler)
+
+// 或使用 Use 方法
+exportGroup := router.Group("/api/export")
+exportGroup.Use(middleware.SkipBodyLog(middleware.SkipResponseBody))
+exportGroup.GET("/data", exportHandler)
+```
+
+**大小限制行为：**
+
+- **请求体**：超过 `MaxRequestBodySize` 时，记录 `"[请求体超过大小限制]"`
+- **响应体**：超过 `MaxResponseBodySize` 时，记录 `"[响应体超过大小限制]"`
+- **响应大小**：`response_length` 字段始终记录，表示实际响应大小
+- **限制为 0**：设置为 0 表示不限制大小
+
+**日志级别：**
+
+- **5xx 错误**：使用 `ErrorWithField` 记录
+- **其他状态码**：使用 `InfoWithField` 记录
 
 ## 异常处理
 
@@ -398,9 +467,15 @@ func setupRouter() *gin.Engine {
     ))
 
     // 4. 请求日志记录
-    r.Use(middleware.IOLog(
-        middleware.WithSensitiveFields([]string{"password", "token"}),
-    ))
+    r.Use(middleware.IOLog(nil)) // 使用默认配置
+
+    // 或者自定义配置
+    // ioLogConfig := &middleware.IOLogConfig{
+    //     MaxRequestBodySize:  200 * 1024, // 200KB
+    //     MaxResponseBodySize: 200 * 1024, // 200KB
+    //     SensitiveFields: []string{"password", "token"},
+    // }
+    // r.Use(middleware.IOLog(ioLogConfig))
 
     // 5. 限流控制
     r.Use(middleware.IPRateLimiter(100, 200))
@@ -492,6 +567,58 @@ func setupRouter() *gin.Engine {
 }
 ```
 
+### 示例 4：跳过请求体和响应体日志
+
+```go
+package main
+
+import (
+    "github.com/gin-gonic/gin"
+    "github.com/jessewkun/gocommon/middleware"
+)
+
+func setupRouter() *gin.Engine {
+    r := gin.Default()
+
+    // 使用 IOLog 中间件
+    r.Use(middleware.IOLog(nil))
+
+    // 普通接口，正常记录请求体和响应体
+    r.GET("/api/user", getUserHandler)
+    r.POST("/api/user", updateUserHandler)
+
+    // 文件下载接口，跳过响应体日志（响应体太大）
+    r.GET("/api/export", middleware.SkipBodyLog(middleware.SkipResponseBody), exportHandler)
+    r.GET("/api/download/:file", middleware.SkipBodyLog(middleware.SkipResponseBody), downloadHandler)
+
+    // 文件上传接口，跳过请求体日志（请求体太大）
+    r.POST("/api/upload", middleware.SkipBodyLog(middleware.SkipRequestBody), uploadHandler)
+
+    // 大文件上传接口，同时跳过请求体和响应体日志
+    r.POST("/api/upload-large", middleware.SkipBodyLog(middleware.SkipAllBody), uploadLargeHandler)
+
+    // 批量上传接口，只跳过请求体日志
+    r.POST("/api/batch-upload", middleware.SkipBodyLog(middleware.SkipRequestBody), batchUploadHandler)
+
+    // 使用路由组跳过响应体日志
+    exportGroup := r.Group("/api/export", middleware.SkipBodyLog(middleware.SkipResponseBody))
+    exportGroup.GET("/data", exportDataHandler)
+    exportGroup.GET("/report", exportReportHandler)
+
+    // 使用路由组跳过请求体日志
+    uploadGroup := r.Group("/api/upload", middleware.SkipBodyLog(middleware.SkipRequestBody))
+    uploadGroup.POST("/file", uploadFileHandler)
+    uploadGroup.POST("/image", uploadImageHandler)
+
+    // 使用路由组同时跳过请求体和响应体日志
+    largeUploadGroup := r.Group("/api/upload-large")
+    largeUploadGroup.Use(middleware.SkipBodyLog(middleware.SkipAllBody))
+    largeUploadGroup.POST("/file", uploadLargeFileHandler)
+
+    return r
+}
+```
+
 ## 中间件执行顺序
 
 建议的中间件执行顺序：
@@ -523,9 +650,19 @@ func setupRouter() *gin.Engine {
 ### 日志记录
 
 1. **敏感数据**：确保配置所有敏感字段进行脱敏
-2. **日志大小**：合理设置请求体和响应体大小限制
-3. **性能影响**：日志记录会影响性能，生产环境建议只记录关键信息
-4. **日志存储**：确保日志存储和查询性能
+2. **日志大小**：合理设置请求体和响应体大小限制（默认 100KB）
+   - 超过限制时，会记录提示信息而不是实际内容
+   - 可通过 `SkipBodyLog()` 完全跳过请求体或响应体日志
+3. **跳过请求体或响应体日志**：
+   - 一般要求都记录请求体和响应体，但对于较大的接口可以跳过
+   - 使用 `SkipBodyLog(SkipRequestBody)` 跳过请求体日志
+   - 使用 `SkipBodyLog(SkipResponseBody)` 跳过响应体日志
+   - 使用 `SkipBodyLog(SkipAllBody)` 同时跳过请求体和响应体日志
+   - 跳过请求体日志时，请求体仍会被读取（因为需要在 `c.Next()` 之前读取），但不会记录到日志中
+   - 跳过响应体日志时，响应体不会被获取和记录
+   - 其他请求信息（路径、查询参数、请求头等）和响应大小（`response_length`）仍会记录
+5. **性能影响**：日志记录会影响性能，生产环境建议只记录关键信息
+6. **日志存储**：确保日志存储和查询性能
 
 ### 异常处理
 

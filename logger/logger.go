@@ -70,7 +70,9 @@ func Init() error {
 	}
 
 	initSystemInfo()
-	logzap = zap.New(initCore(), zap.AddCallerSkip(2), zap.AddCaller())
+	// AddCallerSkip(3) 跳过 3 层包装函数，指向业务代码的实际调用位置
+	// 调用链：业务代码 -> logger.Info -> log -> _log -> logzap.Info
+	logzap = zap.New(initCore(), zap.AddCallerSkip(3), zap.AddCaller())
 	return nil
 }
 
@@ -139,6 +141,17 @@ func log(c context.Context, entry LogEntry) {
 	if Cfg.Closed {
 		return
 	}
+	_log(c, entry)
+
+	// 发送报警
+	SendAlarm(c, string(entry.Level), entry.Tag, entry.Message, entry.Error)
+}
+
+// _log 不发送报警的日志记录函数，用于内部日志记录
+func _log(c context.Context, entry LogEntry) {
+	if Cfg.Closed {
+		return
+	}
 
 	fields := formatField(c, entry.Tag)
 
@@ -167,9 +180,6 @@ func log(c context.Context, entry LogEntry) {
 	case FatalLevel:
 		logzap.Fatal(entry.Message, fields...)
 	}
-
-	// 发送报警
-	SendAlarm(c, string(entry.Level), entry.Tag, entry.Message, entry.Error)
 }
 
 // Info 记录信息日志
