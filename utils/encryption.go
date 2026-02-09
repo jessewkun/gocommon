@@ -33,6 +33,12 @@ func (ac *AesCbc) Encode(data string) (string, error) {
 	_data := []byte(data)
 	_key := []byte(ac.Key)
 	_iv := []byte(ac.Iv)
+	if len(_key) != 16 && len(_key) != 24 && len(_key) != 32 {
+		return "", errors.New("invalid AES key length")
+	}
+	if len(_iv) != aes.BlockSize {
+		return "", errors.New("invalid AES iv length")
+	}
 
 	_data = ac.pKCS7Padding(_data)
 	block, err := aes.NewCipher(_key)
@@ -55,6 +61,12 @@ func (ac *AesCbc) Decode(data string) (string, error) {
 	}
 	_key := []byte(ac.Key)
 	_iv := []byte(ac.Iv)
+	if len(_key) != 16 && len(_key) != 24 && len(_key) != 32 {
+		return "", errors.New("invalid AES key length")
+	}
+	if len(_iv) != aes.BlockSize {
+		return "", errors.New("invalid AES iv length")
+	}
 
 	block, err := aes.NewCipher(_key)
 	if err != nil {

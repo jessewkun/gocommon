@@ -191,9 +191,14 @@ func (m *Manager) runTask(name string, task Task) error {
 		resultChan <- result{err: err}
 	}()
 
-	// 等待任务执行结果
-	res := <-resultChan
-	err := res.err
+	// 等待任务执行结果或超时/取消
+	var err error
+	select {
+	case res := <-resultChan:
+		err = res.err
+	case <-taskCtx.Done():
+		err = taskCtx.Err()
+	}
 
 	// 如果错误是由于上下文超时/取消引起的，包装成更明确的超时错误信息
 	if errors.Is(err, context.DeadlineExceeded) {

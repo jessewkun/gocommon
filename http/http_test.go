@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -74,6 +75,10 @@ func createTestServer(t *testing.T) *httptest.Server {
 			handleTestTimeout(w, r)
 		case "/test/error":
 			handleTestError(w, r)
+		case "/test/stream":
+			handleTestStream(w, r)
+		case "/test/stream/slow":
+			handleTestStreamSlow(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -167,6 +172,31 @@ func handleTestTimeout(w http.ResponseWriter, r *http.Request) {
 func handleTestError(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusInternalServerError)
 	w.Write([]byte("服务器内部错误"))
+}
+
+// handleTestStream 模拟 SSE/按行流式响应
+func handleTestStream(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.WriteHeader(http.StatusOK)
+	lines := []string{"data: line1\n", "data: line2\n", "data: line3\n", "data: done\n"}
+	for _, line := range lines {
+		w.Write([]byte(line))
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+	}
+}
+
+// handleTestStreamSlow 模拟慢速流式响应（用于超时测试）
+func handleTestStreamSlow(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("data: first\n"))
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+	time.Sleep(3 * time.Second)
+	w.Write([]byte("data: second\n"))
 }
 
 // 测试客户端创建
@@ -372,6 +402,110 @@ func TestClient_Post(t *testing.T) {
 		resp, err := client.Post(context.Background(), req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	})
+}
+
+// 测试 PostStream 流式 POST
+func TestClient_PostStream(t *testing.T) {
+	server := createTestServer(t)
+	defer server.Close()
+
+	client := NewClient(Option{
+		Timeout: 10 * time.Second,
+		IsLog:   ptr(false),
+	})
+
+	t.Run("成功流式请求", func(t *testing.T) {
+		var lines [][]byte
+		err := client.PostStream(context.Background(), RequestPost{
+			URL:     server.URL + "/test/stream",
+			Payload: map[string]string{"test": "stream"},
+			Headers: map[string]string{
+				"Content-Type": "application/json",
+				"Accept":       "text/event-stream",
+			},
+		}, func(line []byte) error {
+			lines = append(lines, append([]byte(nil), line...))
+			return nil
+		})
+		require.NoError(t, err)
+		require.Len(t, lines, 4)
+		assert.Equal(t, "data: line1", string(lines[0]))
+		assert.Equal(t, "data: line2", string(lines[1]))
+		assert.Equal(t, "data: line3", string(lines[2]))
+		assert.Equal(t, "data: done", string(lines[3]))
+	})
+
+	t.Run("回调返回错误时中止并返回错误", func(t *testing.T) {
+		errAbort := errors.New("abort stream")
+		var callCount int
+		err := client.PostStream(context.Background(), RequestPost{
+			URL:     server.URL + "/test/stream",
+			Payload: nil,
+			Headers: map[string]string{"Accept": "text/event-stream"},
+		}, func(line []byte) error {
+			callCount++
+			if callCount >= 2 {
+				return errAbort
+			}
+			return nil
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "流式处理回调函数出错")
+		assert.ErrorIs(t, err, errAbort)
+		assert.Equal(t, 2, callCount)
+	})
+
+	t.Run("API返回错误状态码时返回错误", func(t *testing.T) {
+		var called bool
+		err := client.PostStream(context.Background(), RequestPost{
+			URL:     server.URL + "/test/error",
+			Payload: nil,
+		}, func(line []byte) error {
+			called = true
+			return nil
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "500")
+		assert.Contains(t, err.Error(), "服务器内部错误")
+		assert.False(t, called)
+	})
+
+	t.Run("流式请求支持单次超时", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+		err := client.PostStream(ctx, RequestPost{
+			URL:     server.URL + "/test/stream/slow",
+			Payload: nil,
+			Headers: map[string]string{"Accept": "text/event-stream"},
+			Timeout: 1 * time.Second,
+		}, func(line []byte) error {
+			return nil
+		})
+		require.Error(t, err)
+		assert.True(t, strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "context") || strings.Contains(err.Error(), "deadline"))
+	})
+
+	t.Run("自定义StreamBuffer时正常按行回调", func(t *testing.T) {
+		customClient := NewClient(Option{
+			Timeout:             10 * time.Second,
+			IsLog:               ptr(false),
+			StreamBufferInitial: 256,
+			StreamBufferMax:     4096,
+		})
+		var lines [][]byte
+		err := customClient.PostStream(context.Background(), RequestPost{
+			URL:     server.URL + "/test/stream",
+			Payload: nil,
+			Headers: map[string]string{"Accept": "text/event-stream"},
+		}, func(line []byte) error {
+			lines = append(lines, append([]byte(nil), line...))
+			return nil
+		})
+		require.NoError(t, err)
+		require.Len(t, lines, 4)
+		assert.Equal(t, "data: line1", string(lines[0]))
+		assert.Equal(t, "data: done", string(lines[3]))
 	})
 }
 

@@ -123,8 +123,8 @@ func (bc *BigCacheWrapper) Get(key string) (interface{}, bool) {
 	if item.ExpireAt != nil && time.Now().After(*item.ExpireAt) {
 		atomic.AddInt64(&bc.stats.Expirations, 1)
 		atomic.AddInt64(&bc.stats.Misses, 1)
-		// 异步删除过期项
-		go bc.deleteExpired(key)
+		// 同步删除，避免高并发下 goroutine 爆炸
+		bc.deleteExpired(key)
 		return nil, false
 	}
 

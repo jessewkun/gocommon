@@ -44,7 +44,8 @@ func NewManager(configs map[string]*Config) (*Manager, error) {
 			e := fmt.Errorf("create elasticsearch client %s failed: %w", dbName, err)
 			allErrors = append(allErrors, e)
 			logger.ErrorWithMsg(context.Background(), TAG, "%s", e.Error())
-			continue // 创建失败则不加入连接池
+			mgr.conns[dbName] = nil
+			continue
 		}
 
 		// 验证连接
@@ -64,6 +65,7 @@ func NewManager(configs map[string]*Config) (*Manager, error) {
 			if res != nil {
 				res.Body.Close()
 			}
+			mgr.conns[dbName] = nil
 			continue
 		}
 		if res != nil {
@@ -86,6 +88,9 @@ func (m *Manager) GetConn(dbName string) (*Client, error) {
 	defer m.mu.RUnlock()
 
 	if client, ok := m.conns[dbName]; ok {
+		if client == nil {
+			return nil, fmt.Errorf("elasticsearch client '%s' connection failed, please check configuration", dbName)
+		}
 		return client, nil
 	}
 	return nil, fmt.Errorf("elasticsearch client '%s' not found", dbName)
@@ -127,6 +132,15 @@ func (m *Manager) HealthCheck() map[string]*HealthStatus {
 
 			status := &HealthStatus{
 				Timestamp: time.Now().UnixMilli(),
+			}
+
+			if c == nil {
+				status.Status = "error"
+				status.Error = "client is nil"
+				mu.Lock()
+				resp[name] = status
+				mu.Unlock()
+				return
 			}
 
 			start := time.Now()

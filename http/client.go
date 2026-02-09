@@ -7,8 +7,16 @@ import (
 	"github.com/spf13/cast"
 )
 
+// 流式 buffer 默认值（字节）
+const (
+	DefaultStreamBufferInitial = 64 * 1024   // 64KB
+	DefaultStreamBufferMax     = 1024 * 1024 // 1MB
+)
+
 type Client struct {
-	client *resty.Client
+	client              *resty.Client
+	streamBufferInitial int
+	streamBufferMax     int
 }
 
 func NewClient(opt Option) *Client {
@@ -71,7 +79,18 @@ func NewClient(opt Option) *Client {
 		return nil
 	})
 
+	streamBufInit := opt.StreamBufferInitial
+	streamBufMax := opt.StreamBufferMax
+	if streamBufInit <= 0 {
+		streamBufInit = DefaultStreamBufferInitial
+	}
+	if streamBufMax <= 0 {
+		streamBufMax = DefaultStreamBufferMax
+	}
+
 	return &Client{
-		client: client,
+		client:              client,
+		streamBufferInitial: streamBufInit,
+		streamBufferMax:     streamBufMax,
 	}
 }

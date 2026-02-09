@@ -29,9 +29,9 @@ func NewManager(configs map[string]*Config) (*Manager, error) {
 
 	for dbName, conf := range configs {
 		if err := setMongoDefaultConfig(conf); err != nil {
-			e := fmt.Errorf("mongodb %s setDefaultConfig error: %w", dbName, err)
-			allErrors = append(allErrors, e)
-			logger.ErrorWithMsg(context.Background(), TAG, "%s", e.Error())
+			allErrors = append(allErrors, err)
+			logger.ErrorWithMsg(context.Background(), TAG, "%s", err.Error())
+			mgr.conns[dbName] = nil
 			continue // 继续尝试下一个
 		}
 
@@ -40,6 +40,7 @@ func NewManager(configs map[string]*Config) (*Manager, error) {
 			e := fmt.Errorf("connect to mongodb %s failed, error: %w", dbName, err)
 			allErrors = append(allErrors, e)
 			logger.ErrorWithMsg(context.Background(), TAG, "%s", e.Error())
+			mgr.conns[dbName] = nil
 			continue // 继续尝试下一个
 		}
 		mgr.conns[dbName] = client
@@ -57,10 +58,13 @@ func (m *Manager) GetConn(dbIns string) (*mongo.Client, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	if client, ok := m.conns[dbIns]; ok && client != nil {
+	if client, ok := m.conns[dbIns]; ok {
+		if client == nil {
+			return nil, fmt.Errorf("mongodb instance '%s' connection failed, please check configuration", dbIns)
+		}
 		return client, nil
 	}
-	return nil, fmt.Errorf("mongodb instance '%s' not found or is not connected", dbIns)
+	return nil, fmt.Errorf("mongodb instance '%s' not found", dbIns)
 }
 
 // Close 关闭所有 MongoDB 连接
@@ -94,9 +98,6 @@ func (m *Manager) Close() error {
 
 // HealthCheck 执行 MongoDB 健康检查
 func (m *Manager) HealthCheck() map[string]*HealthStatus {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	m.mu.RLock()
 	connections := make(map[string]*mongo.Client, len(m.conns))
 	for dbName, client := range m.conns {
@@ -123,12 +124,16 @@ func (m *Manager) HealthCheck() map[string]*HealthStatus {
 		if conf != nil {
 			status.MaxPool = conf.MaxPoolSize
 		}
-		status.Available = status.MaxPool - status.InUse
+		if status.MaxPool > 0 && status.InUse >= 0 && status.InUse <= status.MaxPool {
+			status.Available = status.MaxPool - status.InUse
+		}
 		status.Idle = 0 // MongoDB 驱动不直接提供空闲连接数
 
 		// 执行Ping检查
 		startTime := time.Now()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		if err := client.Ping(ctx, readpref.Primary()); err != nil {
+			cancel()
 			status.Status = "error"
 			switch {
 			case errors.Is(err, context.DeadlineExceeded):
@@ -140,6 +145,7 @@ func (m *Manager) HealthCheck() map[string]*HealthStatus {
 			}
 			logger.ErrorWithMsg(ctx, TAG, "ping mongodb %s failed, error: %s", dbName, err)
 		} else {
+			cancel()
 			status.Status = "success"
 		}
 		status.Latency = time.Since(startTime).Milliseconds()

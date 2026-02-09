@@ -43,6 +43,7 @@ type RateLimiterConfig struct {
 	cleanupTicker *time.Ticker
 	// 停止清理的信号通道
 	stopCleanup chan struct{}
+	stopOnce    sync.Once
 }
 
 // DefaultRateLimiterConfig 返回默认配置
@@ -101,6 +102,9 @@ func RateLimiter(cfg *RateLimiterConfig) gin.HandlerFunc {
 
 	// 启动 IP 限流器清理
 	if cfg.EnableIPLimit {
+		if cfg.CleanupInterval <= 0 {
+			cfg.CleanupInterval = time.Minute
+		}
 		cfg.cleanupTicker = time.NewTicker(cfg.CleanupInterval)
 		go func() {
 			for {
@@ -251,7 +255,12 @@ func GetIPLimitersInfo(cfg *RateLimiterConfig) map[string]time.Time {
 
 // StopCleanup 停止清理定时器
 func StopCleanup(cfg *RateLimiterConfig) {
-	if cfg.cleanupTicker != nil {
-		close(cfg.stopCleanup)
+	if cfg == nil {
+		return
 	}
+	cfg.stopOnce.Do(func() {
+		if cfg.cleanupTicker != nil {
+			close(cfg.stopCleanup)
+		}
+	})
 }

@@ -44,6 +44,9 @@ type Option struct {
 	RetryMaxWaitTime   time.Duration     // 最大重试等待时间
 	RetryWith5xxStatus bool              // 是否对5xx状态码进行重试
 	IsLog              *bool             // 是否记录日志，nil表示不覆盖
+	// 流式响应（PostStream）扫描行时的 buffer：初始容量与最大容量（字节），为 0 时使用默认值
+	StreamBufferInitial int // 默认 64KB
+	StreamBufferMax     int // 默认 1MB
 }
 
 func (o *Option) String() string {

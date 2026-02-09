@@ -23,25 +23,25 @@ func setDefaultConfig(conf *Config) error {
 	if len(conf.Addrs) < 1 {
 		return errors.New("redis addrs is empty")
 	}
-	if conf.PoolSize == 0 {
+	if conf.PoolSize <= 0 {
 		conf.PoolSize = 100
 	}
-	if conf.IdleTimeout == 0 {
+	if conf.IdleTimeout <= 0 {
 		conf.IdleTimeout = 300 // 5 minutes
 	}
-	if conf.IdleCheckFrequency == 0 {
+	if conf.IdleCheckFrequency <= 0 {
 		conf.IdleCheckFrequency = 10
 	}
-	if conf.MinIdleConns == 0 {
+	if conf.MinIdleConns <= 0 {
 		conf.MinIdleConns = 3
 	}
-	if conf.MaxRetries == 0 {
+	if conf.MaxRetries <= 0 {
 		conf.MaxRetries = 3
 	}
-	if conf.DialTimeout == 0 {
+	if conf.DialTimeout <= 0 {
 		conf.DialTimeout = 2
 	}
-	if conf.SlowThreshold == 0 {
+	if conf.SlowThreshold <= 0 {
 		conf.SlowThreshold = 200
 	}
 

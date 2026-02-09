@@ -23,19 +23,19 @@ func setDefaultConfig(conf *Config) error {
 	if len(conf.Dsn) < 1 {
 		return fmt.Errorf("mysql dsn is invalid")
 	}
-	if conf.MaxConn == 0 {
+	if conf.MaxConn <= 0 {
 		conf.MaxConn = 50
 	}
-	if conf.MaxIdleConn == 0 {
+	if conf.MaxIdleConn <= 0 {
 		conf.MaxIdleConn = 25
 	}
-	if conf.ConnMaxLifeTime == 0 {
+	if conf.ConnMaxLifeTime <= 0 {
 		conf.ConnMaxLifeTime = 3600
 	}
-	if conf.ConnMaxIdleTime == 0 {
+	if conf.ConnMaxIdleTime <= 0 {
 		conf.ConnMaxIdleTime = 600
 	}
-	if conf.SlowThreshold == 0 {
+	if conf.SlowThreshold <= 0 {
 		conf.SlowThreshold = 500
 	}
 	return nil

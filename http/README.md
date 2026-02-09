@@ -2,10 +2,11 @@
 
 ## 功能简介
 
-HTTP 客户端模块提供简洁易用的 HTTP 请求封装，基于 `resty` 库实现，支持 GET、POST、文件上传、文件下载等常用操作。
+HTTP 客户端模块提供简洁易用的 HTTP 请求封装，基于 `resty` 库实现，支持 GET、POST、流式 POST、文件上传、文件下载等常用操作。
 
 - ✅ 简洁的 API 设计，易于使用
 - ✅ 支持 GET、POST 请求
+- ✅ 支持流式 POST（PostStream），按行回调，适用于 SSE 等场景
 - ✅ 支持文件上传（字节流和文件路径两种方式）
 - ✅ 支持文件下载
 - ✅ 支持请求超时设置（全局和单次请求）
@@ -13,6 +14,7 @@ HTTP 客户端模块提供简洁易用的 HTTP 请求封装，基于 `resty` 库
 - ✅ 支持 5xx 状态码重试（可选）
 - ✅ 支持请求日志记录（可配置）
 - ✅ 支持透传参数（从 context 自动提取并添加到请求头）
+- ✅ 支持流式响应 buffer 配置（初始容量与单行最大长度）
 - ✅ 支持配置热更新
 - ✅ 提供 URL 查询参数构建工具
 - ✅ 提供 Cookie 设置工具（支持跨域）
@@ -99,7 +101,27 @@ client := http.NewClient(http.Option{
     Timeout: 10 * time.Second,
     IsLog:   &isLog,
 })
+
+// 流式请求 buffer 配置（PostStream 按行扫描时的初始容量与单行最大长度，为 0 时使用默认 64KB/1MB）
+client := http.NewClient(http.Option{
+    Timeout:                30 * time.Second,
+    StreamBufferInitial:    128 * 1024,      // 128KB 初始
+    StreamBufferMax:        2 * 1024 * 1024, // 2MB 单行最大
+})
 ```
+
+**Option 字段说明：**
+
+| 字段 | 说明 |
+|------|------|
+| Headers | 默认请求头 |
+| Timeout | 默认超时时间 |
+| Retry | 最大重试次数 |
+| RetryWaitTime / RetryMaxWaitTime | 重试等待时间 |
+| RetryWith5xxStatus | 是否对 5xx 状态码重试 |
+| IsLog | 是否记录请求日志，nil 表示不覆盖配置 |
+| StreamBufferInitial | 流式响应行 buffer 初始容量（字节），默认 64KB |
+| StreamBufferMax | 流式响应单行最大长度（字节），默认 1MB |
 
 ### 2. GET 请求
 
@@ -168,25 +190,37 @@ if err != nil {
 
 fmt.Printf("状态码: %d\n", resp.StatusCode)
 fmt.Printf("响应体: %s\n", string(resp.Body))
+```
 
-// 发送结构体
-type User struct {
-    Name  string `json:"name"`
-    Email string `json:"email"`
-}
+### 4. 流式 POST（PostStream）
 
-user := User{
-    Name:  "李四",
-    Email: "lisi@example.com",
-}
+适用于 SSE（Server-Sent Events）等流式响应，按行回调，不将整个响应体读入内存。
 
-req := http.RequestPost{
-    URL:     "https://api.example.com/users",
-    Payload: user,
+```go
+err := client.PostStream(ctx, http.RequestPost{
+    URL:     "https://api.example.com/stream",
+    Payload: bodyBytes,
+    Headers: map[string]string{
+        "Content-Type": "application/json",
+        "Accept":       "text/event-stream",
+    },
+    Timeout: 5 * time.Minute, // 流式请求建议较长超时
+}, func(line []byte) error {
+    // 每收到一行调用一次，line 为原始行内容（含 "data: " 前缀等）
+    fmt.Println(string(line))
+    return nil // 返回非 nil 会中止流式读取
+})
+if err != nil {
+    log.Printf("流式请求失败: %v", err)
 }
 ```
 
-### 4. 文件上传
+**说明：**
+
+- 使用 `bufio.Scanner` 按行读取，行 buffer 大小由创建客户端时的 `StreamBufferInitial`、`StreamBufferMax` 决定（未配置时默认 64KB 初始、1MB 单行最大）。
+- 单行超过 `StreamBufferMax` 会报错，可根据接口实际情况在 Option 中调大。
+
+### 5. 文件上传
 
 #### 方式一：使用字节流上传
 
@@ -225,7 +259,7 @@ req := http.RequestUploadWithFilePath{
 resp, err := client.UploadWithFilePath(ctx, req)
 ```
 
-### 5. 文件下载
+### 6. 文件下载
 
 ```go
 req := http.RequestDownload{
@@ -302,6 +336,15 @@ client := http.NewClient(http.Option{
 - 默认情况下，只对网络错误进行重试
 - 如果启用 `RetryWith5xxStatus`，会对 500-599 状态码进行重试
 - 重试等待时间会逐渐增加，但不会超过 `RetryMaxWaitTime`
+
+### 流式响应 Buffer
+
+`PostStream` 按行扫描响应体时，使用客户端创建时配置的 buffer 大小：
+
+- **StreamBufferInitial**：行 buffer 初始容量（字节），默认 64KB（`http.DefaultStreamBufferInitial`）。
+- **StreamBufferMax**：单行允许的最大长度（字节），默认 1MB（`http.DefaultStreamBufferMax`）。
+
+若接口返回的 SSE 行较长（例如单行 JSON 很大），可在创建客户端时增大上述两个值，避免 `buffer overflow`。
 
 ### 请求日志
 
@@ -483,7 +526,12 @@ if resp.StatusCode != http.StatusOK {
    - 如果文件已存在，会被覆盖
    - 确保有写入权限
 
-7. **并发安全**：
+7. **流式请求（PostStream）**：
+   - 按行回调，不缓冲整个响应体，适合 SSE 等长连接
+   - 行 buffer 由 Option 的 `StreamBufferInitial`、`StreamBufferMax` 控制，为 0 时使用默认 64KB/1MB
+   - 单行超过 `StreamBufferMax` 会报错，需根据实际接口调大
+
+8. **并发安全**：
    - 客户端实例是并发安全的，可以在多个 goroutine 中使用
    - 建议为每个服务或模块创建独立的客户端实例
 

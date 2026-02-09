@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jessewkun/gocommon/logger"
@@ -56,9 +57,57 @@ func setMongoDefaultConfig(conf *Config) error {
 	return nil
 }
 
+func buildMongoURI(uris []string) (string, error) {
+	if len(uris) == 0 {
+		return "", fmt.Errorf("mongodb uris is empty")
+	}
+	if len(uris) == 1 {
+		return uris[0], nil
+	}
+
+	// If the first URI contains scheme, try to merge hosts while preserving path/query.
+	first := uris[0]
+	if strings.HasPrefix(first, "mongodb://") || strings.HasPrefix(first, "mongodb+srv://") {
+		schemeSep := strings.Index(first, "://")
+		if schemeSep < 0 {
+			return first, nil
+		}
+		scheme := first[:schemeSep+3]
+		rest := first[schemeSep+3:]
+		pathIdx := strings.Index(rest, "/")
+		hostPart := rest
+		pathPart := ""
+		if pathIdx >= 0 {
+			hostPart = rest[:pathIdx]
+			pathPart = rest[pathIdx:]
+		}
+
+		hosts := []string{hostPart}
+		for _, u := range uris[1:] {
+			u = strings.TrimPrefix(u, "mongodb://")
+			u = strings.TrimPrefix(u, "mongodb+srv://")
+			if idx := strings.Index(u, "/"); idx >= 0 {
+				u = u[:idx]
+			}
+			if u != "" {
+				hosts = append(hosts, u)
+			}
+		}
+
+		return scheme + strings.Join(hosts, ",") + pathPart, nil
+	}
+
+	// Treat uris as host list without scheme.
+	return "mongodb://" + strings.Join(uris, ","), nil
+}
+
 // newClient 连接 MongoDB
 func newClient(conf *Config) (*mongo.Client, error) {
-	clientOptions := options.Client().ApplyURI(conf.Uris[0])
+	uri, err := buildMongoURI(conf.Uris)
+	if err != nil {
+		return nil, err
+	}
+	clientOptions := options.Client().ApplyURI(uri)
 
 	// 连接池配置
 	clientOptions.SetMaxPoolSize(uint64(conf.MaxPoolSize))

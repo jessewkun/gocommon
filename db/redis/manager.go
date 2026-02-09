@@ -37,7 +37,10 @@ func NewManager(configs map[string]*Config) (*Manager, error) {
 			e := fmt.Errorf("connect to redis %s failed, error: %w", dbName, err)
 			allErrors = append(allErrors, e)
 			logger.ErrorWithMsg(context.Background(), TAG, "%s", e.Error())
-			// 不再 continue，继续将 client 实例加入 map
+			// 连接失败，也保存配置信息，以便后续重试或检查
+			// 使用 nil 表示连接失败，但配置已处理
+			mgr.conns[dbName] = nil
+			continue
 		}
 		mgr.conns[dbName] = client
 		logger.Info(context.Background(), TAG, "create redis client %s succ, addrs: %v", dbName, conf.Addrs)
@@ -55,6 +58,9 @@ func (m *Manager) GetConn(dbIns string) (redis.UniversalClient, error) {
 	defer m.mu.RUnlock()
 
 	if client, ok := m.conns[dbIns]; ok {
+		if client == nil {
+			return nil, fmt.Errorf("redis instance '%s' connection failed, please check configuration", dbIns)
+		}
 		return client, nil
 	}
 	return nil, fmt.Errorf("redis instance '%s' not found", dbIns)
@@ -89,9 +95,6 @@ func (m *Manager) Close() error {
 
 // HealthCheck 执行 Redis 健康检查
 func (m *Manager) HealthCheck() map[string]*HealthStatus {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	m.mu.RLock()
 	connections := make(map[string]redis.UniversalClient, len(m.conns))
 	for dbName, db := range m.conns {
@@ -104,9 +107,17 @@ func (m *Manager) HealthCheck() map[string]*HealthStatus {
 		status := &HealthStatus{
 			Timestamp: time.Now().UnixMilli(),
 		}
+		if client == nil {
+			status.Status = "error"
+			status.Error = "client is nil"
+			resp[dbName] = status
+			continue
+		}
 
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		startTime := time.Now()
 		_, err := client.Ping(ctx).Result()
+		cancel()
 		latency := time.Since(startTime).Milliseconds()
 		status.Latency = latency
 

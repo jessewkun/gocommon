@@ -97,9 +97,6 @@ func (m *Manager) Close() error {
 
 // HealthCheck 执行mysql健康检查
 func (m *Manager) HealthCheck() map[string]*HealthStatus {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	// 先获取所有连接信息，避免在Ping时持有锁
 	m.mu.RLock()
 	connections := make(map[string]*gorm.DB, len(m.conns))
@@ -113,12 +110,18 @@ func (m *Manager) HealthCheck() map[string]*HealthStatus {
 		status := &HealthStatus{
 			Timestamp: time.Now().UnixMilli(),
 		}
+		if db == nil {
+			status.Status = "error"
+			status.Error = "db is nil"
+			resp[dbName] = status
+			continue
+		}
 
 		sqldb, err := db.DB()
 		if err != nil {
 			status.Status = "error"
 			status.Error = fmt.Sprintf("get db instance error: %v", err)
-			logger.ErrorWithMsg(ctx, TAG, "get mysql %s db failed, error: %s", dbName, err)
+			logger.ErrorWithMsg(context.Background(), TAG, "get mysql %s db failed, error: %s", dbName, err)
 			resp[dbName] = status
 			continue
 		}
@@ -133,6 +136,7 @@ func (m *Manager) HealthCheck() map[string]*HealthStatus {
 		status.WaitTime = stats.WaitDuration.Nanoseconds()
 
 		startTime := time.Now()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		if err := sqldb.PingContext(ctx); err != nil {
 			status.Status = "error"
 			switch {
@@ -144,8 +148,10 @@ func (m *Manager) HealthCheck() map[string]*HealthStatus {
 				status.Error = err.Error()
 			}
 			logger.ErrorWithMsg(ctx, TAG, "ping mysql %s failed, error: %s", dbName, err)
+			cancel()
 		} else {
 			status.Status = "success"
+			cancel()
 		}
 		status.Latency = time.Since(startTime).Milliseconds()
 

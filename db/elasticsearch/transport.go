@@ -36,17 +36,21 @@ func (t *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 	ctx := req.Context()
 
 	// Safely read request body for logging.
-	// This reads the entire body into memory, which can be an issue for very large
-	// requests like bulk indexing.
+	// Read only a limited chunk to avoid large memory usage.
 	var reqBodyBytes []byte
 	if req.Body != nil {
+		lr := io.LimitReader(req.Body, maxLogBodySize)
 		var err error
-		reqBodyBytes, err = io.ReadAll(req.Body)
+		reqBodyBytes, err = io.ReadAll(lr)
 		if err != nil {
 			logger.Warn(ctx, TAG, "failed to read request body for logging: %v", err)
 		}
-		// Restore req.Body for the transport to read.
-		req.Body = io.NopCloser(bytes.NewBuffer(reqBodyBytes))
+		// Restore req.Body by combining the part we read with the remaining stream.
+		originalBodyCloser := req.Body
+		req.Body = &readCloser{
+			Reader: io.MultiReader(bytes.NewReader(reqBodyBytes), originalBodyCloser),
+			Closer: originalBodyCloser,
+		}
 	}
 
 	resp, err := t.transport.RoundTrip(req)

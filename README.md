@@ -2,7 +2,7 @@
 
 ## 简介
 
-`gocommon` 是一套面向 Go 后端项目的通用基础库。涵盖数据库、缓存、日志、配置、API 响应、工具函数、中间件、告警、调试、服务发现等常用能力，助力快速构建高质量、可扩展的微服务应用。
+`gocommon` 是一套面向 Go 后端项目的通用基础库。涵盖数据库、缓存、日志、配置、API 响应、工具函数、中间件、告警、调试、服务发现、大模型调用等常用能力，助力快速构建高质量、可扩展的微服务应用。
 
 ## 目录结构
 
@@ -20,6 +20,7 @@
 │   └── localcache/     # 本地缓存模块
 ├── debug/              # 调试与动态开关
 ├── http/               # HTTP 客户端封装
+├── llm/                # 大模型调用
 ├── logger/             # 日志组件
 ├── middleware/         # Gin/HTTP 通用中间件
 ├── nacos/              # Nacos 配置管理与服务发现
@@ -70,6 +71,10 @@
 
 -   [高性能 http](./http/README.md)
 
+### 大模型调用（llm/）
+
+-   [Provider 模式大模型封装](./llm/README.md)：统一接口、按名称+配置获取 Provider，支持 openrouter、openai、gemini 等，业务只依赖 `llm` 包与统一 `ChatRequest`。
+
 ### 日志（logger/）
 
 -   [多级日志](./logger/README.md)
@@ -88,7 +93,7 @@
 
 ### 性能监控（prometheus/）
 
--   [阿里云对象存储](./prometheus/README.md)
+-   [Prometheus 监控指标](./prometheus/README.md)
 
 ### API 响应（response/）
 
@@ -96,7 +101,7 @@
 
 ### 系统路由（router/）
 
--   [系统路由](./router/README.md)
+-   [系统路由 & webSocket](./router/README.md)
 
 ### goroutine 安全（safego/）
 

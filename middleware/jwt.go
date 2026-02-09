@@ -103,8 +103,11 @@ func JwtAuth(config *JWTConfig) gin.HandlerFunc {
 		// 解析JWT
 		claims := &Claims{}
 		token, err := jwt.ParseWithClaims(parts[1], claims, func(token *jwt.Token) (interface{}, error) {
+			if token.Method != jwt.SigningMethodHS256 {
+				return nil, errors.New("unexpected signing method")
+			}
 			return jwtConfig.SecretKey, nil
-		})
+		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 
 		if err != nil {
 			handleError(c, "Unauthorized: "+err.Error())
@@ -117,7 +120,7 @@ func JwtAuth(config *JWTConfig) gin.HandlerFunc {
 		}
 
 		// 检查是否需要刷新token
-		if time.Until(claims.ExpiresAt.Time) < jwtConfig.RefreshTime {
+		if claims.ExpiresAt != nil && time.Until(claims.ExpiresAt.Time) < jwtConfig.RefreshTime {
 			newToken, err := refreshToken(claims)
 			if err != nil {
 				if jwtConfig.EnableLog {
@@ -133,9 +136,19 @@ func JwtAuth(config *JWTConfig) gin.HandlerFunc {
 	}
 }
 
+func ensureJWTConfig() *JWTConfig {
+	jwtConfigOnce.Do(func() {
+		if jwtConfig == nil {
+			jwtConfig = DefaultJWTConfig()
+		}
+	})
+	return jwtConfig
+}
+
 // CreateJwtToken 创建JWT token
 func CreateJwtToken(userID int) (string, error) {
-	expirationTime := time.Now().Add(jwtConfig.Expiration)
+	cfg := ensureJWTConfig()
+	expirationTime := time.Now().Add(cfg.Expiration)
 	claims := &Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -144,19 +157,20 @@ func CreateJwtToken(userID int) (string, error) {
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtConfig.SecretKey)
+	return token.SignedString(cfg.SecretKey)
 }
 
 // RevokeToken 撤销token
 func RevokeToken(token string) {
-	if !jwtConfig.EnableBlacklist {
+	cfg := ensureJWTConfig()
+	if !cfg.EnableBlacklist {
 		return
 	}
 
 	blacklistMutex.Lock()
 	defer blacklistMutex.Unlock()
 
-	blacklist[token] = time.Now().Add(jwtConfig.BlacklistExpiration)
+	blacklist[token] = time.Now().Add(cfg.BlacklistExpiration)
 }
 
 // refreshToken 刷新token

@@ -13,6 +13,9 @@ import (
 // Index 文档写入/更新。body 可以是 io.Reader, []byte, string 或可被 json.Marshal 的结构体。
 // refresh a string that controls when changes made by this request are made visible to search.
 func (c *Client) Index(ctx context.Context, index string, id string, body interface{}, refresh string) error {
+	if body == nil {
+		return fmt.Errorf("index body cannot be nil")
+	}
 	reader, err := anaylzeBody(body)
 	if err != nil {
 		return err
@@ -90,6 +93,9 @@ func (c *Client) Delete(ctx context.Context, index string, id string, refresh st
 // Search 简单搜索。query 可以是 io.Reader, []byte, string 或可被 json.Marshal 的结构体。
 // 结果将解码到 out 中。
 func (c *Client) Search(ctx context.Context, index string, query interface{}, out interface{}) error {
+	if query == nil {
+		return fmt.Errorf("search query cannot be nil")
+	}
 	reader, err := anaylzeBody(query)
 	if err != nil {
 		return err

@@ -51,3 +51,43 @@ func main() {
 ```
 
 现在，你的服务就已经拥有了 `/health/ping`、`/metrics` 和仅限本地访问的 `/debug/pprof/*` 路由。
+
+## WebSocket
+
+提供统一的 WebSocket 升级与消息循环，支持可配置的跨域（CheckOrigin）和读超时。
+
+### 接口
+
+实现 `WebSocketHandler` 即可处理连接、消息与断开：
+
+```go
+type WebSocketHandler interface {
+	OnConnect(c *gin.Context, conn *websocket.Conn) error
+	OnMessage(c *gin.Context, messageType int, message []byte)
+	OnDisconnect(c *gin.Context, conn *websocket.Conn)
+	OnPing(c *gin.Context, conn *websocket.Conn)
+}
+```
+
+### 默认用法
+
+不配置跨域、使用默认 90 秒读超时：
+
+```go
+router.WsHandler(c, myHandler)
+```
+
+### 带配置用法（跨域、超时）
+
+需要从业务配置传入允许的 Origin 或自定义校验时：
+
+```go
+cfg := &router.WsConfig{
+	CheckOrigin:  router.CheckOriginFromAllowList(["http://test.com"]),
+	ReadTimeout: 90 * time.Second, // 可选，不设则默认 90s
+}
+router.WsHandlerWithConfig(c, myHandler, cfg)
+```
+
+- `CheckOrigin` 为 nil 时使用 gorilla/websocket 默认：仅当请求无 Origin 或 Origin 与 Host 一致时通过。
+- `CheckOriginFromAllowList(origins []string)` 可根据白名单生成校验函数；无 Origin 头的请求会放行。

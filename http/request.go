@@ -1,8 +1,11 @@
 package http
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"fmt"
+	"io"
 	"net/url"
 
 	"github.com/spf13/cast"
@@ -165,4 +168,56 @@ func (c *Client) Download(ctx context.Context, req RequestDownload) (respData *R
 		StatusCode: resp.StatusCode(),
 		TraceInfo:  resp.Request.TraceInfo(),
 	}, nil
+}
+
+// PostStream 发送 POST 请求并以流式处理响应
+func (c *Client) PostStream(ctx context.Context, req RequestPost, callback func(line []byte) error) error {
+	// 设置请求超时
+	if req.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, req.Timeout)
+		defer cancel()
+	}
+
+	request := c.client.R().SetContext(ctx).
+		SetBody(req.Payload).
+		SetDoNotParseResponse(true) // 核心：告诉 resty 不要自动解析响应体
+
+	// 设置请求头
+	if req.Headers != nil {
+		request.SetHeaders(req.Headers)
+	}
+
+	resp, err := request.Post(req.URL)
+	if err != nil {
+		return fmt.Errorf("发送流式请求失败: %w", err)
+	}
+	rawBody := resp.RawResponse.Body
+	defer rawBody.Close()
+
+	if resp.IsError() {
+		// 尝试读取错误信息
+		bodyBytes, readErr := io.ReadAll(rawBody)
+		if readErr != nil {
+			return fmt.Errorf("API 返回错误状态 %d, 且读取错误响应体失败: %w", resp.StatusCode(), readErr)
+		}
+		return fmt.Errorf("API 返回错误状态 %d: %s", resp.StatusCode(), string(bodyBytes))
+	}
+
+	scanner := bufio.NewScanner(rawBody)
+	buf := make([]byte, 0, c.streamBufferInitial)
+	scanner.Buffer(buf, c.streamBufferMax)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if err := callback(line); err != nil {
+			return fmt.Errorf("流式处理回调函数出错: %w", err)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("读取流式响应体时出错: %w", err)
+	}
+
+	return nil
 }

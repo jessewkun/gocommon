@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-
 )
 
 // CreateIndex 创建索引。mapping 可以是 io.Reader, []byte, string 或可被 json.Marshal 的结构体。
 // 此方法会处理并关闭响应体，调用者无需关心。
 func (c *Client) CreateIndex(ctx context.Context, index string, mapping interface{}) error {
+	if mapping == nil {
+		return fmt.Errorf("index mapping cannot be nil")
+	}
 	reader, err := anaylzeBody(mapping)
 	if err != nil {
 		return err

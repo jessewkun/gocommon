@@ -42,13 +42,12 @@ func TestNewManager(t *testing.T) {
 			},
 			checkError: func(t *testing.T, err error) {
 				if err != nil {
-					t.Logf("NewManager failed as DB might not be running, which is acceptable: %v", err)
+					t.Skipf("skipping test; redis not available: %v", err)
 				}
 			},
 			checkMgr: func(t *testing.T, mgr *Manager) {
 				assert.NotNil(t, mgr)
 				conn, err := mgr.GetConn("test_db")
-				// The connection should be in the map even if the ping failed
 				assert.NotNil(t, conn)
 				assert.NoError(t, err)
 				assert.IsType(t, &redis.Client{}, conn)
@@ -61,7 +60,7 @@ func TestNewManager(t *testing.T) {
 			},
 			checkError: func(t *testing.T, err error) {
 				if err != nil {
-					t.Logf("NewManager failed as DB might not be running, which is acceptable: %v", err)
+					t.Skipf("skipping test; redis cluster not available: %v", err)
 				}
 			},
 			checkMgr: func(t *testing.T, mgr *Manager) {
