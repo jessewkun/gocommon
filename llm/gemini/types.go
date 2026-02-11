@@ -74,15 +74,18 @@ type GeminiEmbeddingResponse struct {
 
 // GenerationConfig controls the generation of the response
 type GenerationConfig struct {
-	Temperature float64 `json:"temperature,omitempty"`
-	// Add other generation configs like TopP, TopK, MaxOutputTokens if needed
+	Temperature     float64  `json:"temperature,omitempty"`
+	TopP            *float64 `json:"topP,omitempty"`
+	TopK            *int     `json:"topK,omitempty"`
+	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
+	StopSequences   []string `json:"stopSequences,omitempty"`
 }
 
 // GeminiChatRequest is the request to the Gemini Chat API
 type GeminiChatRequest struct {
-	Contents         []GeminiContent   `json:"contents"`
-	SystemInstruction *GeminiContent   `json:"system_instruction,omitempty"`
-	GenerationConfig *GenerationConfig `json:"generationConfig,omitempty"`
+	Contents          []GeminiContent   `json:"contents"`
+	SystemInstruction *GeminiContent    `json:"system_instruction,omitempty"`
+	GenerationConfig  *GenerationConfig `json:"generationConfig,omitempty"`
 }
 
 // --- Stream-specific types ---

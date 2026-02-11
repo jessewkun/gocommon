@@ -77,6 +77,27 @@ fmt.Printf("Token 用量: %+v\n", resp.Usage)
 // fmt.Printf("原始响应: %s\n", string(resp.RawResponse)) // 调试用
 ```
 
+#### OpenRouter 推理参数（reasoning tokens）
+
+OpenRouter 支持通过 `reasoning` 参数控制推理 token 行为（参考 OpenRouter 文档）。
+该参数仅对 `openrouter` Provider 生效。
+
+```go
+chatReq := &llm.ChatRequest{
+    Model: "openai/o1-mini",
+    Messages: []llm.Message{
+        {Role: "user", Content: "请解释这个问题的推理过程。"},
+    },
+    Reasoning: &llm.ReasoningConfig{
+        Effort:  "high",  // 可选：xhigh/high/medium/low/minimal/none
+        Exclude: boolPtr(true), // 可选：是否从响应中排除 reasoning
+        // MaxTokens: intPtr(1024), // 或者使用 max_tokens 指定推理 token 上限
+    },
+}
+```
+
+> 注意：`Effort` 与 `MaxTokens` 建议二选一，具体行为以 OpenRouter 文档为准。
+
 #### 流式调用
 
 ```go

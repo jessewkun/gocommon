@@ -211,6 +211,18 @@ func (p *Provider) toGeminiChatRequest(ctx context.Context, req *llm.ChatRequest
 			Temperature: req.Temperature,
 		},
 	}
+	if req.TopP != nil {
+		geminiReq.GenerationConfig.TopP = req.TopP
+	}
+	if req.TopK != nil {
+		geminiReq.GenerationConfig.TopK = req.TopK
+	}
+	if req.MaxTokens != nil {
+		geminiReq.GenerationConfig.MaxOutputTokens = req.MaxTokens
+	}
+	if req.Stop != nil && len(req.Stop) > 0 {
+		geminiReq.GenerationConfig.StopSequences = req.Stop
+	}
 
 	messages := req.Messages
 	// Find and set system instruction if it exists

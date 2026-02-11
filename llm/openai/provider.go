@@ -215,8 +215,41 @@ func (p *Provider) buildChatBody(req *llm.ChatRequest, stream bool) (map[string]
 		"temperature": req.Temperature,
 		"stream":      stream,
 	}
-	if req.ResponseFormat == "json_object" {
-		body["response_format"] = map[string]interface{}{"type": "json_object"}
+	if req.TopP != nil {
+		body["top_p"] = *req.TopP
+	}
+	if req.MaxTokens != nil {
+		body["max_tokens"] = *req.MaxTokens
+	}
+	if req.Stop != nil && len(req.Stop) > 0 {
+		body["stop"] = req.Stop
+	}
+	if req.PresencePenalty != nil {
+		body["presence_penalty"] = *req.PresencePenalty
+	}
+	if req.FrequencyPenalty != nil {
+		body["frequency_penalty"] = *req.FrequencyPenalty
+	}
+	if req.N != nil {
+		body["n"] = *req.N
+	}
+	if req.User != "" {
+		body["user"] = req.User
+	}
+	if req.Seed != nil {
+		body["seed"] = *req.Seed
+	}
+	if req.LogitBias != nil && len(req.LogitBias) > 0 {
+		body["logit_bias"] = req.LogitBias
+	}
+	if req.Tools != nil && len(req.Tools) > 0 {
+		body["tools"] = req.Tools
+	}
+	if req.ToolChoice != nil {
+		body["tool_choice"] = req.ToolChoice
+	}
+	if req.ResponseFormat != "" {
+		body["response_format"] = map[string]interface{}{"type": req.ResponseFormat}
 	}
 	return body, nil
 }
